@@ -1,6 +1,12 @@
-# MCEdit-Unified
+# MCEdit-TallWorlds
 
-MCEdit-Unified is an updated fork of the original MCEdit by Codewarrior. The previous license still applies. MCEdit-Unified is an open-source, BSD-licensed world editor for the viral indie hit [Minecraft](http://www.minecraft.net/). For downloads and update info, visit the official website at [khroki.github.io/MCEdit-Unified](http://khroki.github.io/MCEdit-Unified/). The rest of this file is intended for computer programmers, Linux/Mac users, and those who wish to run from source.
+MCEdit-TallWorlds is a fork of MCEdit-Unified which is in itself an updated fork of the original MCEdit by Codewarrior. The previous license still applies.
+
+MCEdit-TallWorlds is a prototype of MCEdit that supports cubic chunks that is produced by the [Tall Worlds Mod](http://www.cuchazinteractive.com/tall-worlds/).
+
+MCEdit-TallWorlds is still in development.
+
+MCEdit-Unified is an open-source, BSD-licensed world editor for the viral indie hit [Minecraft](http://www.minecraft.net/). For downloads and update info, visit the official website at [khroki.github.io/MCEdit-Unified](http://khroki.github.io/MCEdit-Unified/). The rest of this file is intended for computer programmers, Linux/Mac users, and those who wish to run from source.
 
 ## Localisation
 
