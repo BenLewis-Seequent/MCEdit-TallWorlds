@@ -6,7 +6,9 @@ import socket
 import logging
 import struct
 import nbt
-#from pymclevel import LightedChunk, ChunkedLevelMixin, EntityLevel, ChunkBase
+import os
+import materials
+from pymclevel import LightedChunk, ChunkedLevelMixin, EntityLevel, ChunkBase
 
 log = logging.getLogger(__name__)
 
@@ -65,21 +67,45 @@ class _Client(object):
     def close(self):
         self._socket.sendall('\x00')
         self._socket.close()
-# class TWWorld(EntityLevel):
-#     def __init__(self, filename):
-#         self.filename = filename
-#         self._vm = None
-#         self._client = None
-#
-#     def _launchVM(self):
-#         self._vm = _VM(self.filename)
-#         self._client = _Client()
-#
-#
-# class TWCube(ChunkBase):
-#     pass
-#
-#
-# class TWColumn(ChunkBase):
-#     pass
+
+
+class TWLevel(EntityLevel):
+
+    dimNo = 0
+    parentWorld = None
+    isInfinite = True
+    materials = materials.alphaMaterials
+
+    def __init__(self, filename, readonly):
+        self.filename = filename
+        self.readonly = readonly
+
+        self._vm = None
+        self._client = None
+
+    @classmethod
+    def _isLevel(self, filename):
+        if not os.path.isdir(filename):
+            filename = os.path.dirname(filename)
+        files = os.listdir(filename)
+        return "cubes.dim0.db" in files
+
+    def _launchVM(self):
+        self._vm = _VM(self.filename)
+        self._client = _Client()
+
+    def close(self):
+        self._client.close()
+        self._vm.close()
+
+    def displayName(self):
+        return os.path.basename(os.path.dirname(self.filename))
+
+
+class TWCube(ChunkBase):
+    pass
+
+
+class TWColumn(ChunkBase):
+    pass
 

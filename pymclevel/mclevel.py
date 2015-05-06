@@ -180,6 +180,7 @@ from numpy import fromstring
 import os
 from pocket import PocketWorld, NewPocketWorld
 from schematic import INVEditChest, MCSchematic, ZipSchematic
+from tall_worlds import TWLevel
 import sys
 import traceback
 
@@ -209,6 +210,14 @@ def fromFile(filename, loadInfinite=True, readonly=False):
 
     if PocketWorld._isLevel(filename):
         return PocketWorld(filename)
+
+    if TWLevel._isLevel(filename):
+        log.info("Detected tall world level")
+        if loadInfinite:
+            return TWLevel(filename=filename, readonly=readonly)
+        else:
+            raise ValueError("Asked to load {0} which is an infinite level, loadInfinite was False".format(
+                os.path.basename(filename)))
 
     if MCInfdevOldLevel._isLevel(filename):
         log.info(u"Detected Infdev level.dat")
