@@ -411,6 +411,7 @@ class MCEdit(GLViewport):
             except Exception, e:
                 logging.error(u'Failed to load file {0}: {1!r}'.format(
                     filename, e))
+                print(traceback.format_exc())
                 return None
 
             self.remove(self.fileOpener)

@@ -64,6 +64,21 @@ class _Client(object):
             log.error("Invalid reply id %x", packet_id)
             raise IOError
 
+    def requestColumn(self, x, z):
+        self._send('!bii', 0xC, x, z)
+        packet_id = self._recv('!b', 1)[0]
+        if packet_id == 0x10:
+            log.warning("server closing")
+            raise IOError
+        elif packet_id == 0x1D:
+            size = self._recv('!i', 4)[0]
+            return nbt.load(buf=self._socket.recv(size))
+        elif packet_id == 0x1C:
+            return None
+        else:
+            log.error("Invalid reply id %x", packet_id)
+            raise IOError
+
     def close(self):
         self._socket.sendall('\x00')
         self._socket.close()
@@ -82,6 +97,11 @@ class TWLevel(EntityLevel):
 
         self._vm = None
         self._client = None
+        self._loadedColumns = {}
+
+        self.Width = 0
+        self.Length = 0
+        self.Height = 0
 
     @classmethod
     def _isLevel(self, filename):
@@ -101,11 +121,44 @@ class TWLevel(EntityLevel):
     def displayName(self):
         return os.path.basename(os.path.dirname(self.filename))
 
+    # column methods
+
+    def getChunk(self, cx, cz):
+        column = self._loadedColumns.get((cx, cz))
+        if column is not None:
+            return column
+        column = TWColumn(cx, cz, self, self._client.requestColumn(cx, cz))
+        self._loadedColumns[(cx, cz)] = column
+        return column
+
+    def getChunk_cc(self, cx, cy, cz):
+        return self.getChunk(cx, cz).getCube(cy)
+
 
 class TWCube(ChunkBase):
-    pass
+    Height = 16
+
+    def __init__(self, world, cx, cy, cz, tag):
+        self.world = world
+        self.cx = cx
+        self.cy = cy
+        self.cz = cz
+        self.root_tag = tag
 
 
 class TWColumn(ChunkBase):
-    pass
+    def __init__(self, cx, cz, world, tag):
+        self.world = world
+        self.root_tag = tag
+        self.cx = cx
+        self.cz = cz
+        self._loadedChunks = {}
+
+    def getCube(self, cy):
+        chunk = self._loadedChunks.get(cy)
+        if chunk is not None:
+            return chunk
+        chunk = TWCube(self, self.cx, cy, self.cz, self.world._client.requestChunk(self.cx, cy, self.cz))
+        self._loadedChunks[cy] = chunk
+        return chunk
 

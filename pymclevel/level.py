@@ -225,6 +225,8 @@ class MCLevel(object):
     def removeTileTicksInBox(self, box):
         pass
 
+    # chunk methods
+
     @property
     def chunkCount(self):
         return (self.Width + 15 >> 4) * (self.Length + 15 >> 4)
@@ -235,6 +237,12 @@ class MCLevel(object):
         being a chunked level format."""
         return itertools.product(xrange(0, self.Width + 15 >> 4), xrange(0, self.Length + 15 >> 4))
 
+    @property
+    def allChunks_cc(self):
+        """Returns a synthetic list of chunk positions (xPos, yPos, zPos), to fake
+        being a chunked level format."""
+        return itertools.product(xrange(0, self.Width + 15 >> 4), xrange(0, self.Height + 15 >> 4), xrange(0, self.Length + 15 >> 4))
+
     def getChunks(self, chunks=None):
         """ pass a list of chunk coordinate tuples to get an iterator yielding
         AnvilChunks. pass nothing for an iterator of every chunk in the level.
@@ -242,6 +250,12 @@ class MCLevel(object):
         if chunks is None:
             chunks = self.allChunks
         return (self.getChunk(cx, cz) for (cx, cz) in chunks if self.containsChunk(cx, cz))
+
+    def getChunks_cc(self, chunks=None):
+        if chunks is None:
+            chunks = self.allChunks_cc
+        return (self.getChunk_cc(cx, cy, cz) for (cx, cy, cz) in chunks if self.containsChunk_cc(cx, cy, cz))
+
 
     def _getFakeChunkEntities(self, cx, cz):
         """Returns Entities, TileEntities"""
@@ -271,6 +285,9 @@ class MCLevel(object):
         f.root_tag = nbt.TAG_Compound()
 
         return f
+
+    def getChunk_cc(self, cx, cy, cz):
+        pass
 
     def getAllChunkSlices(self):
         slices = (slice(None), slice(None), slice(None),)
@@ -317,6 +334,9 @@ class MCLevel(object):
         bounds = self.bounds
         return ((bounds.mincx <= cx < bounds.maxcx) and
                 (bounds.mincz <= cz < bounds.maxcz))
+
+    def containsChunk_cc(self, cx, cy, cz):
+        pass
 
     def fakeBlocksForChunk(self, cx, cz):
         # return a 16x16xH block array for rendering.  Alpha levels can
