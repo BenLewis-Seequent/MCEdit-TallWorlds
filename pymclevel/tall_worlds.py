@@ -5,6 +5,7 @@ import subprocess
 import socket
 import logging
 import struct
+import time
 import nbt
 import os
 import materials
@@ -37,7 +38,12 @@ class _Client(object):
         self._socket.setblocking(1)
 
     def _recv(self, fmt, size):
-        data = self._socket.recv(size)
+        data = ''
+        while len(data) < size:
+            newData = self._socket.recv(size - len(data))
+            if len(newData) == 0:
+                raise IOError
+            data += newData
         return struct.unpack(fmt, data)
 
     def _send(self, fmt, *args):
@@ -50,31 +56,63 @@ class _Client(object):
 
         Returns the nbt structure of the chunk or raises an exception on IOError
         """
-        self._send('!biii', 0x4, x, y, z)
+        self._send('!biii', 0x2, x, y, z)
         packet_id = self._recv('!b', 1)[0]
-        if packet_id == 0x10:
+        if packet_id == 0x40:
             log.warning("server closing")
             raise IOError
-        elif packet_id == 0x15:
+        elif packet_id == 0x52:
             size = self._recv('!i', 4)[0]
             return nbt.load(buf=self._socket.recv(size))
-        elif packet_id == 0x14:
+        elif packet_id == 0x42:
             return None
         else:
             log.error("Invalid reply id %x", packet_id)
             raise IOError
 
     def requestColumn(self, x, z):
-        self._send('!bii', 0xC, x, z)
+        self._send('!bii', 0x22, x, z)
         packet_id = self._recv('!b', 1)[0]
-        if packet_id == 0x10:
+        if packet_id == 0x40:
             log.warning("server closing")
             raise IOError
-        elif packet_id == 0x1D:
+        elif packet_id == 0x72:
             size = self._recv('!i', 4)[0]
             return nbt.load(buf=self._socket.recv(size))
-        elif packet_id == 0x1C:
+        elif packet_id == 0x62:
             return None
+        else:
+            log.error("Invalid reply id %x", packet_id)
+            raise IOError
+
+    def requestListChunks(self):
+        self._send('!b', 0x4)
+        packet_id = self._recv('!b', 1)[0]
+        if packet_id == 0x40:
+            log.warning("server closing")
+            raise IOError
+        elif packet_id == 0x54:
+            size = self._recv('!i', 4)[0]
+            poss = list()
+            for _ in range(size):
+                poss.append(self._recv('!iii', 12))
+            return poss
+        else:
+            log.error("Invalid reply id %x", packet_id)
+            raise IOError
+
+    def requestListColumns(self):
+        self._send('!b', 0x24)
+        packet_id = self._recv('!b', 1)[0]
+        if packet_id == 0x40:
+            log.warning("server closing")
+            raise IOError
+        elif packet_id == 0x74:
+            size = self._recv('!i', 4)[0]
+            poss = list()
+            for _ in range(size):
+                poss.append(self._recv('!ii', 8))
+            return poss
         else:
             log.error("Invalid reply id %x", packet_id)
             raise IOError
@@ -99,6 +137,9 @@ class TWLevel(EntityLevel):
         self._client = None
         self._loadedColumns = {}
 
+        self._allColumns = None
+        self._allCubes = None
+
         self.Width = 0
         self.Length = 0
         self.Height = 0
@@ -112,6 +153,7 @@ class TWLevel(EntityLevel):
 
     def _launchVM(self):
         self._vm = _VM(self.filename)
+        time.sleep(5)
         self._client = _Client()
 
     def close(self):
@@ -127,12 +169,31 @@ class TWLevel(EntityLevel):
         column = self._loadedColumns.get((cx, cz))
         if column is not None:
             return column
+        if self._vm is None:
+            self._launchVM()
         column = TWColumn(cx, cz, self, self._client.requestColumn(cx, cz))
         self._loadedColumns[(cx, cz)] = column
         return column
 
+    @property
+    def allChunks(self):
+        if self._allColumns is None:
+            if self._vm is None:
+                self._launchVM()
+            self._allColumns = self._client.requestListColumns()
+        return self._allColumns.__iter__()
+
+    # cube methods
+
     def getChunk_cc(self, cx, cy, cz):
         return self.getChunk(cx, cz).getCube(cy)
+
+    def allChunks_cc(self):
+        if self._allCubes is None:
+            if self._vm is None:
+                self._launchVM()
+            self._allCubes = self._client.requestListCubes()
+        return self._allCubes.__iter__()
 
 
 class TWCube(ChunkBase):
