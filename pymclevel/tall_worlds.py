@@ -10,6 +10,7 @@ import nbt
 import os
 import materials
 from pymclevel import LightedChunk, ChunkedLevelMixin, EntityLevel, ChunkBase
+from pc_metadata import PCMetadata
 
 log = logging.getLogger(__name__)
 
@@ -122,7 +123,7 @@ class _Client(object):
         self._socket.close()
 
 
-class TWLevel(EntityLevel):
+class TWLevel(EntityLevel, PCMetadata):
 
     dimNo = 0
     parentWorld = None
@@ -143,6 +144,17 @@ class TWLevel(EntityLevel):
         self.Width = 0
         self.Length = 0
         self.Height = 0
+
+    def getFilePath(self, path):
+        path = path.replace("/", os.path.sep)
+        return os.path.join(self.filename, path)
+
+    def getFolderPath(self, path):
+        path = self.getFilePath(path)
+        if not os.path.exists(path) and "players" not in path:
+            os.makedirs(path)
+
+        return path
 
     @classmethod
     def _isLevel(self, filename):
