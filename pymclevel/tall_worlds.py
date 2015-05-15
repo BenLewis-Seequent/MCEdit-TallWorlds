@@ -150,6 +150,8 @@ class TWLevel(EntityLevel, PCMetadata):
         self.Length = 0
         self.Height = 0
 
+        self.acquireSessionLock()
+
         self.loadLevelDat()
 
     def getFilePath(self, path):
