@@ -131,6 +131,11 @@ class TWLevel(EntityLevel, PCMetadata):
     materials = materials.alphaMaterials
 
     def __init__(self, filename, readonly):
+        if os.path.isdir(filename):
+            if 'level.dat' in os.listdir(filename):
+                filename = os.path.join(filename, 'level.dat')
+            else:
+                raise IOError("file is not a level as it doesn't have level.dat")
         self.filename = filename
         self.readonly = readonly
 
@@ -145,9 +150,11 @@ class TWLevel(EntityLevel, PCMetadata):
         self.Length = 0
         self.Height = 0
 
+        self.loadLevelDat()
+
     def getFilePath(self, path):
         path = path.replace("/", os.path.sep)
-        return os.path.join(self.filename, path)
+        return os.path.join(os.path.dirname(self.filename), path)
 
     def getFolderPath(self, path):
         path = self.getFilePath(path)
@@ -164,7 +171,7 @@ class TWLevel(EntityLevel, PCMetadata):
         return "cubes.dim0.db" in files
 
     def _launchVM(self):
-        self._vm = _VM(self.filename)
+        self._vm = _VM(os.path.dirname(self.filename))
         time.sleep(5)
         self._client = _Client()
 
