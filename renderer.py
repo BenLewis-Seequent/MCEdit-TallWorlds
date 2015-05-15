@@ -513,11 +513,12 @@ class ChunkCalculator(object):
         cx, cy, cz = cr.chunkPosition
         level = cr.renderer.level
         try:
-            chunk = level.getChunk(cx, cy, cz)
+            chunk = level.getChunk_cc(cx, cy, cz)
         except Exception, e:
             if "Session lock lost" in e.message:
                 yield
                 return
+            print(traceback.format_exc())
             logging.warn(u"Error reading chunk: %s", e)
             yield
             return
@@ -901,14 +902,15 @@ class EntityRendererGeneric(BlockRenderer):
 
     @staticmethod
     def _computeVertices(positions, colors, offset=False, chunkPosition=(0, 0)):
-        cx, cz = chunkPosition
+        cx, cy, cz = chunkPosition
         x = cx << 4
+        y = cy << 4
         z = cz << 4
 
         vertexArray = numpy.zeros(shape=(len(positions), 6, 4, 6), dtype='float32')
         if len(positions):
             positions = numpy.array(positions)
-            positions[:, (0, 2)] -= (x, z)
+            positions[:, (0, 1, 2)] -= (x, y, z)
             if offset:
                 positions -= 0.5
 
@@ -2678,39 +2680,42 @@ class MCRenderer(object):
         # print "discardChunksOutsideViewDistance"
         d = self.effectiveViewDistance
         cx = (self.position[0] - self.origin[0]) / 16
+        cy = (self.position[1] - self.origin[1]) / 16
         cz = (self.position[2] - self.origin[2]) / 16
 
-        origin = (cx - d, cz - d)
+        origin = (cx - d, cy - d, cz - d)
         size = d * 2
 
         if not len(self.chunkRenderers):
             return
-        (ox, oz) = origin
+        (ox, oy, oz) = origin
         # chunks = numpy.fromiter(self.chunkRenderers.iterkeys(), dtype='int32', count=len(self.chunkRenderers))
-        chunks = numpy.fromiter(self.chunkRenderers.iterkeys(), dtype='i,i', count=len(self.chunkRenderers))
+        chunks = numpy.fromiter(self.chunkRenderers.iterkeys(), dtype='i,i,i', count=len(self.chunkRenderers))
         chunks.dtype = 'int32'
-        chunks.shape = len(self.chunkRenderers), 2
+        chunks.shape = len(self.chunkRenderers), 3
 
         if size:
             outsideChunks = chunks[:, 0] < ox - 1
             outsideChunks |= chunks[:, 0] > ox + size
-            outsideChunks |= chunks[:, 1] < oz - 1
-            outsideChunks |= chunks[:, 1] > oz + size
+            outsideChunks |= chunks[:, 1] < oy - 1
+            outsideChunks |= chunks[:, 1] > ox + size
+            outsideChunks |= chunks[:, 2] < oz - 1
+            outsideChunks |= chunks[:, 2] > oz + size
             chunks = chunks[outsideChunks]
 
         self.discardChunks(chunks)
 
     def discardChunks(self, chunks):
-        for cx, cz in chunks:
-            self.discardChunk(cx, cz)
+        for cx, cy, cz in chunks:
+            self.discardChunk(cx, cy, cz)
         self.oldPosition = None  # xxx force reload
 
-    def discardChunk(self, cx, cz):
+    def discardChunk(self, cx, cy, cz):
         " discards the chunk renderer for this chunk and compresses the chunk "
-        if (cx, cz) in self.chunkRenderers:
-            self.bufferUsage -= self.chunkRenderers[cx, cz].bufferSize
-            self.chunkRenderers[cx, cz].forgetDisplayLists()
-            del self.chunkRenderers[cx, cz]
+        if (cx, cy, cz) in self.chunkRenderers:
+            self.bufferUsage -= self.chunkRenderers[cx, cy, cz].bufferSize
+            self.chunkRenderers[cx, cy, cz].forgetDisplayLists()
+            del self.chunkRenderers[cx, cy, cz]
 
     _fastLeaves = False
 
@@ -2756,16 +2761,16 @@ class MCRenderer(object):
         if self.showHiddenOres:
             self.discardAllChunks()
 
-    def invalidateChunk(self, cx, cz, layers=None):
+    def invalidateChunk(self, cx, cy, cz, layers=None):
         " marks the chunk for regenerating vertex data and display lists "
-        if (cx, cz) in self.chunkRenderers:
+        if (cx, cy, cz) in self.chunkRenderers:
             # self.chunkRenderers[(cx,cz)].invalidate()
             # self.bufferUsage -= self.chunkRenderers[(cx, cz)].bufferSize
 
-            self.chunkRenderers[(cx, cz)].invalidate(layers)
+            self.chunkRenderers[(cx, cy, cz)].invalidate(layers)
             # self.bufferUsage += self.chunkRenderers[(cx, cz)].bufferSize
 
-            self.invalidChunkQueue.append((cx, cz))  # xxx encapsulate
+            self.invalidChunkQueue.append((cx, cy, cz))  # xxx encapsulate
 
     def invalidateChunksInBox(self, box, layers=None):
         # If the box is at the edge of any chunks, expanding by 1 makes sure the neighboring chunk gets redrawn.
@@ -2780,8 +2785,8 @@ class MCRenderer(object):
         self.invalidateChunks(box.chunkPositions, [Layer.TileTicks])
 
     def invalidateChunks(self, chunks, layers=None):
-        for (cx, cz) in chunks:
-            self.invalidateChunk(cx, cz, layers)
+        for (cx, cy, cz) in chunks:
+            self.invalidateChunk(cx, cy, cz, layers)
 
         self.stopWork()
         self.discardMasterList()

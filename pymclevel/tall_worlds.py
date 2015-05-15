@@ -12,6 +12,9 @@ import materials
 from pymclevel import LightedChunk, ChunkedLevelMixin, EntityLevel, ChunkBase
 from pc_metadata import PCMetadata
 
+from level import computeChunkHeightMap
+from infiniteworld import unpackNibbleArray
+
 log = logging.getLogger(__name__)
 
 port = 25666
@@ -228,8 +231,38 @@ class TWCube(ChunkBase):
         self.cx = cx
         self.cy = cy
         self.cz = cz
+        self.chunkPosition = (cx, cy, cz)
         self.root_tag = tag
 
+        # blocks
+        self.Blocks = tag['Blocks'].value
+        self.Blocks.shape = (16, 16, 16)
+        # data values
+        self.Data = tag['Data'].value
+        self.Data.shape = (16, 16, 8)
+        self.Data = unpackNibbleArray(self.Data)
+        # sky light
+        self.SkyLight = tag['SkyLight'].value
+        self.SkyLight.shape = (16, 16, 8)
+        self.SkyLight = unpackNibbleArray(self.SkyLight)
+        # block light
+        self.BlockLight = tag['BlockLight'].value
+        self.BlockLight.shape = (16, 16, 8)
+        self.BlockLight = unpackNibbleArray(self.BlockLight)
+        self.HeightMap = computeChunkHeightMap(self.world.materials, self.Blocks)
+
+
+    @property
+    def Entities(self):
+        return self.root_tag['Entities']
+
+    @property
+    def TileEntities(self):
+        return self.root_tag['TileEntities']
+
+    @property
+    def TileTicks(self):
+        return self.root_tag['TileTicks']
 
 class TWColumn(ChunkBase):
     def __init__(self, cx, cz, world, tag):
