@@ -510,10 +510,10 @@ class ChunkCalculator(object):
             return
 
         lod = cr.detailLevel
-        cx, cz = cr.chunkPosition
+        cx, cy, cz = cr.chunkPosition
         level = cr.renderer.level
         try:
-            chunk = level.getChunk(cx, cz)
+            chunk = level.getChunk(cx, cy, cz)
         except Exception, e:
             if "Session lock lost" in e.message:
                 yield
@@ -572,21 +572,18 @@ class ChunkCalculator(object):
 
     @staticmethod
     def getNeighboringChunks(chunk):
-        cx, cz = chunk.chunkPosition
+        cx, cy, cz = chunk.chunkPosition
         level = chunk.world
 
         neighboringChunks = {}
-        for dir, dx, dz in ((pymclevel.faces.FaceXDecreasing, -1, 0),
-                            (pymclevel.faces.FaceXIncreasing, 1, 0),
-                            (pymclevel.faces.FaceZDecreasing, 0, -1),
-                            (pymclevel.faces.FaceZIncreasing, 0, 1)):
-            if not level.containsChunk(cx + dx, cz + dz):
+        for dir, (dx, dy, dz) in pymclevel.faces.faceDirections:
+            if not level.containsChunk_cc(cx + dx, cy + dy, cz + dz):
                 neighboringChunks[dir] = pymclevel.infiniteworld.ZeroChunk(level.Height)
             else:
                 # if not level.chunkIsLoaded(cx+dx,cz+dz):
                 #    raise StopIteration
                 try:
-                    neighboringChunks[dir] = level.getChunk(cx + dx, cz + dz)
+                    neighboringChunks[dir] = level.getChunk_cc(cx + dx, cy + dy, cz + dz)
                 except (EnvironmentError, pymclevel.mclevelbase.ChunkNotPresent, pymclevel.mclevelbase.ChunkMalformed):
                     neighboringChunks[dir] = pymclevel.infiniteworld.ZeroChunk(level.Height)
         return neighboringChunks
@@ -676,10 +673,10 @@ class ChunkCalculator(object):
         for each block facing and material"""
 
         # chunkBlocks and chunkLights shall be indexed [x,z,y] to follow infdev's convention
-        cx, cz = cr.chunkPosition
+        cx, cy, cz = cr.chunkPosition
         level = cr.renderer.level
 
-        chunk = level.getChunk(cx, cz)
+        chunk = level.getChunk_cc(cx, cy, cz)
         neighboringChunks = self.getNeighboringChunks(chunk)
 
         areaBlocks = self.getAreaBlocks(chunk, neighboringChunks)
@@ -846,12 +843,12 @@ class BlockRenderer(object):
         return l
 
     def drawArrays(self, chunkPosition, showRedraw):
-        cx, cz = chunkPosition
-        y = 0
-        if hasattr(self, 'y'):
-            y = self.y
+        cx, cy, cz = chunkPosition
+        # y = 0
+        # if hasattr(self, 'y'):
+        #     y = self.y
         with gl.glPushMatrix(GL.GL_MODELVIEW):
-            GL.glTranslate(cx << 4, y, cz << 4)
+            GL.glTranslate(cx << 4, cy << 4, cz << 4)
 
             if showRedraw:
                 GL.glColor(1.0, 0.25, 0.25, 1.0)
@@ -2524,14 +2521,16 @@ class MCRenderer(object):
         # if the renderer is offset into the world somewhere, adjust for that
         ox, oy, oz = self.origin
         camx -= ox
+        camy -= oy
         camz -= oz
 
         camcx = int(numpy.floor(camx)) >> 4
+        camcy = int(numpy.floor(camy)) >> 4
         camcz = int(numpy.floor(camz)) >> 4
 
-        cx, cz = cpos
+        cx, cy, cz = cpos
 
-        return max(abs(cx - camcx), abs(cz - camcz))
+        return max(abs(cx - camcx), abs(cy - camcy), abs(cz - camcz))
 
     overheadMode = False
 
@@ -2611,7 +2610,7 @@ class MCRenderer(object):
 
     position = (0, 0, 0)
 
-    def loadChunksStartingFrom(self, wx, wz, distance=None):  # world position
+    def loadChunksStartingFrom(self, wx, wy, wz, distance=None):  # world position
         if None is self.level:
             return
         if self.level.saving:
@@ -2622,24 +2621,29 @@ class MCRenderer(object):
         else:
             d = distance
 
-        self.chunkIterator = self.iterateChunks(wx, wz, d * 2)
+        self.chunkIterator = self.iterateChunks(wx, wy, wz, d * 2)
 
-    def iterateChunks(self, x, z, d):
+    def iterateChunks(self, x, y, z, d):
         cx = x >> 4
+        cy = y >> 4
         cz = z >> 4
 
-        yield (cx, cz)
+        yield (cx, cy, cz)
 
         step = dir = 1
 
         while True:
             for i in range(step):
                 cx += dir
-                yield (cx, cz)
+                yield (cx, cy, cz)
+
+            for i in range(step):
+                cy += dir
+                yield (cx, cy, cz)
 
             for i in range(step):
                 cz += dir
-                yield (cx, cz)
+                yield (cx, cy, cz)
 
             step += 1
             if step > d and not self.overheadMode:
@@ -2842,13 +2846,14 @@ class MCRenderer(object):
             self.loadAllChunks()
         else:
             # subtract self.origin to load nearby chunks correctly for preview renderers
-            self.loadChunksStartingFrom(int(cameraPos[0]) - self.origin[0], int(cameraPos[2]) - self.origin[2])
+            self.loadChunksStartingFrom(int(cameraPos[0]) - self.origin[0], int(cameraPos[1]) - self.origin[1],
+                                        int(cameraPos[2]) - self.origin[2])
 
     def loadAllChunks(self):
         box = self.level.bounds
 
-        self.loadChunksStartingFrom(box.origin[0] + box.width / 2, box.origin[2] + box.length / 2,
-                                    max(box.width, box.length))
+        self.loadChunksStartingFrom(box.origin[0] + box.width / 2, box.origin[1] + box.Height / 2,
+                                    box.origin[2] + box.length / 2, max(box.width, box.length))
 
     _floorTexture = None
 
@@ -3131,11 +3136,11 @@ class MCRenderer(object):
     def workOnChunk(self, c):
         work = 0
 
-        if self.level.containsChunk(*c):
+        if self.level.containsChunk_cc(*c):
             cr = self.getChunkRenderer(c)
             if self.viewingFrustum:
                 # if not self.viewingFrustum.visible(numpy.array([[c[0] * 16 + 8, 64, c[1] * 16 + 8, 1.0]]), 64).any():
-                if not self.viewingFrustum.visible1([c[0] * 16 + 8, self.level.Height / 2, c[1] * 16 + 8, 1.0],
+                if not self.viewingFrustum.visible1([c[0] * 16 + 8, c[1] * 16 + 8, c[2] * 16 + 8, 1.0],
                                                     self.level.Height / 2):
                     raise StopIteration
 

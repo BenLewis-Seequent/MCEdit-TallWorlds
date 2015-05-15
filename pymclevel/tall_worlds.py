@@ -206,6 +206,9 @@ class TWLevel(EntityLevel, PCMetadata):
 
     # cube methods
 
+    def containsChunk_cc(self, cx, cy, cz):
+        return (cx, cy, cz) in self.allChunks_cc()
+
     def getChunk_cc(self, cx, cy, cz):
         return self.getChunk(cx, cz).getCube(cy)
 
@@ -213,7 +216,7 @@ class TWLevel(EntityLevel, PCMetadata):
         if self._allCubes is None:
             if self._vm is None:
                 self._launchVM()
-            self._allCubes = self._client.requestListCubes()
+            self._allCubes = self._client.requestListChunks()
         return self._allCubes.__iter__()
 
 
