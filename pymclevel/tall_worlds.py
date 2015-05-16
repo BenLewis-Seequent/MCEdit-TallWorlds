@@ -97,9 +97,10 @@ class _Client(object):
             raise IOError
         elif packet_id == 0x54:
             size = self._recv('!i', 4)[0]
-            poss = list()
+            # the use of the set instead is important for the lookup times
+            poss = set()
             for _ in range(size):
-                poss.append(self._recv('!iii', 12))
+                poss.add(self._recv('!iii', 12))
             return poss
         else:
             log.error("Invalid reply id %x", packet_id)
@@ -113,9 +114,9 @@ class _Client(object):
             raise IOError
         elif packet_id == 0x74:
             size = self._recv('!i', 4)[0]
-            poss = list()
+            poss = set()
             for _ in range(size):
-                poss.append(self._recv('!ii', 8))
+                poss.add(self._recv('!ii', 8))
             return poss
         else:
             log.error("Invalid reply id %x", packet_id)
@@ -210,17 +211,18 @@ class TWLevel(EntityLevel, PCMetadata):
     # cube methods
 
     def containsChunk_cc(self, cx, cy, cz):
-        return (cx, cy, cz) in self.allChunks_cc()
+        return (cx, cy, cz) in self.allChunks_cc
 
     def getChunk_cc(self, cx, cy, cz):
         return self.getChunk(cx, cz).getCube(cy)
 
+    @property
     def allChunks_cc(self):
         if self._allCubes is None:
             if self._vm is None:
                 self._launchVM()
             self._allCubes = self._client.requestListChunks()
-        return self._allCubes.__iter__()
+        return self._allCubes
 
 
 class TWCube(ChunkBase):

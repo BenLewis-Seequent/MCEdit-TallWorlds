@@ -2620,8 +2620,7 @@ class MCRenderer(object):
 
     @property
     def isCubicChunks(self):
-        #return isinstance(self.level, pymclevel.TWLevel)
-        return True
+        return isinstance(self.level, pymclevel.TWLevel)
 
     position = (0, 0, 0)
 
@@ -2639,32 +2638,119 @@ class MCRenderer(object):
         self.chunkIterator = self.iterateChunks(wx, wy, wz, d * 2)
 
     def iterateChunks(self, x, y, z, d):
+        """
+        Iterates over chunks starting from point(x, y, z)
+        out in all direction for d chunks.
+        """
         cx = x >> 4
         cy = y >> 4
         cz = z >> 4
 
         yield (cx, cy, cz)
 
-        step = dir = 1
+        step = 1
 
-        while True:
-            for i in range(step):
-                cx += dir
-                yield (cx, cy, cz)
+        def iterateX(x, y, z, d):
+            yield (x, y, z)
+            step = 1
+            while step < d:
+                yield (x + step, y, z)
+                yield (x - step, y, z)
+                step += 1
 
-            for i in range(step):
-                cy += dir
-                yield (cx, cy, cz)
+        def iterateY(x, y, z, d):
+            yield (x, y, z)
+            step = 1
+            while step < d:
+                yield (x, y + step, z)
+                yield (x, y - step, z)
+                step += 1
 
-            for i in range(step):
-                cz += dir
-                yield (cx, cy, cz)
+        def iterateZ(x, y, z, d):
+            yield (x, y, z)
+            step = 1
+            while step < d:
+                yield (x, y, z + step)
+                yield (x, y, z - step)
+                step += 1
 
+        def iterate2DX(x, y, z, d):
+            yield (x, y, z)
+            step = 1
+            while step < d:
+                for i in (-1, 1):
+                    for c in iterateY(x, y, z + i*step, step):
+                        yield c
+                for i in (-1, 1):
+                    for c in iterateZ(x, y + i*step, z, step):
+                        yield c
+                yield (x, y+step, z+step)
+                yield (x, y+step, z-step)
+                yield (x, y-step, z+step)
+                yield (x, y-step, z-step)
+                step += 1
+
+        def iterate2DY(x, y, z, d):
+            yield (x, y, z)
+            step = 1
+            while step < d:
+                for i in (-1, 1):
+                    for c in iterateX(x, y, z + i*step, step):
+                        yield c
+                for i in (-1, 1):
+                    for c in iterateZ(x + i*step, y, z, step):
+                        yield c
+                yield (x+step, y, z+step)
+                yield (x+step, y, z-step)
+                yield (x-step, y, z+step)
+                yield (x-step, y, z-step)
+                step += 1
+
+        def iterate2DZ(x, y, z, d):
+            yield (x, y, z)
+            step = 1
+            while step < d:
+                for i in (-1, 1):
+                    for c in iterateY(x + i*step, y, z, step):
+                        yield c
+                for i in (-1, 1):
+                    for c in iterateX(x, y + i*step, z, step):
+                        yield c
+                yield (x+step, y+step, z)
+                yield (x-step, y+step, z)
+                yield (x+step, y-step, z)
+                yield (x-step, y-step, z)
+                step += 1
+
+        while step < d:
+            # faces
+            iters = []
+            iters += [iterate2DX(cx + i*step, cy, cz, step) for i in (-1, 1)]
+            iters += [iterate2DY(cx, cy + i*step, cz, step) for i in (-1, 1)]
+            iters += [iterate2DZ(cx, cy, cz + i*step, step) for i in (-1, 1)]
+            try:
+                while True:
+                    for it in iters:
+                        yield it.next()
+            except StopIteration:
+                pass
+            # edges
+            iters = []
+            iters += [iterateX(cx, cy + i*step, cz + j*step, step) for i in (-1, 1) for j in (-1, 1)]
+            iters += [iterateY(cx + i*step, cy, cz + j*step, step) for i in (-1, 1) for j in (-1, 1)]
+            iters += [iterateZ(cx + i*step, cy + j*step, cz, step) for i in (-1, 1) for j in (-1, 1)]
+            try:
+                while True:
+                    for it in iters:
+                        yield it.next()
+            except StopIteration:
+                pass
+            # corners
+            for i in (-1, 1):
+                for j in (-1, 1):
+                    for k in (-1, 1):
+                        yield (cx + i*step, cy + j*step, cz + k*step)
             step += 1
-            if step > d and not self.overheadMode:
-                raise StopIteration
-
-            dir = -dir
 
     chunkIterator = None
 
@@ -2711,7 +2797,7 @@ class MCRenderer(object):
             outsideChunks = chunks[:, 0] < ox - 1
             outsideChunks |= chunks[:, 0] > ox + size
             outsideChunks |= chunks[:, 1] < oy - 1
-            outsideChunks |= chunks[:, 1] > ox + size
+            outsideChunks |= chunks[:, 1] > oy + size
             outsideChunks |= chunks[:, 2] < oz - 1
             outsideChunks |= chunks[:, 2] > oz + size
             chunks = chunks[outsideChunks]
