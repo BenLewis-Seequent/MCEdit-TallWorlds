@@ -9,7 +9,7 @@ import time
 import nbt
 import os
 import materials
-from pymclevel import LightedChunk, ChunkedLevelMixin, EntityLevel, ChunkBase
+from level import EntityLevel, ChunkBase
 from pc_metadata import PCMetadata
 
 from level import computeChunkHeightMap
@@ -233,6 +233,9 @@ class TWCube(ChunkBase):
         self.cz = cz
         self.chunkPosition = (cx, cy, cz)
         self.root_tag = tag
+
+        if 'Blocks' not in tag:
+            print(tag)
 
         # blocks
         self.Blocks = tag['Blocks'].value

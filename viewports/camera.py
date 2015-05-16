@@ -1583,7 +1583,8 @@ class CameraViewport(GLViewport):
         if self.drawFog:
             self.enableFog()
 
-        self.drawFloorQuad()
+        if not self.editor.renderer.isCubicChunks:
+            self.drawFloorQuad()
 
         self.editor.renderer.viewingFrustum = self.viewingFrustum
         self.editor.renderer.draw()

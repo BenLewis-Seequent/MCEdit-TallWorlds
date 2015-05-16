@@ -2618,6 +2618,11 @@ class MCRenderer(object):
 
         self.loadNearbyChunks()
 
+    @property
+    def isCubicChunks(self):
+        #return isinstance(self.level, pymclevel.TWLevel)
+        return True
+
     position = (0, 0, 0)
 
     def loadChunksStartingFrom(self, wx, wy, wz, distance=None):  # world position
@@ -2943,10 +2948,9 @@ class MCRenderer(object):
             GL.glPopAttrib()
 
     def drawLoadableChunkMarkers(self):
-        if not self.isPreviewer or isinstance(self.level, pymclevel.MCInfdevOldLevel):
+        if (not self.isPreviewer or isinstance(self.level, pymclevel.MCInfdevOldLevel)) \
+                and not self.isCubicChunks:
             self.loadableChunkMarkers.call(self._drawLoadableChunkMarkers)
-
-            # self.drawCompressedChunkMarkers()
 
     needsImmediateRedraw = False
     viewingFrustum = None
