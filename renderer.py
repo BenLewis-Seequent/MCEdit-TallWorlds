@@ -579,20 +579,19 @@ class ChunkCalculator(object):
         neighboringChunks = {}
         for dir, (dx, dy, dz) in pymclevel.faces.faceDirections:
             if not level.containsChunk_cc(cx + dx, cy + dy, cz + dz):
-                neighboringChunks[dir] = pymclevel.infiniteworld.ZeroChunk(level.Height)
+                neighboringChunks[dir] = pymclevel.infiniteworld.ZeroChunk(chunk.Height)
             else:
                 # if not level.chunkIsLoaded(cx+dx,cz+dz):
                 #    raise StopIteration
                 try:
                     neighboringChunks[dir] = level.getChunk_cc(cx + dx, cy + dy, cz + dz)
                 except (EnvironmentError, pymclevel.mclevelbase.ChunkNotPresent, pymclevel.mclevelbase.ChunkMalformed):
-                    neighboringChunks[dir] = pymclevel.infiniteworld.ZeroChunk(level.Height)
+                    neighboringChunks[dir] = pymclevel.infiniteworld.ZeroChunk(chunk.Height)
         return neighboringChunks
 
     @staticmethod
     def getAreaBlocks(chunk, neighboringChunks):
         chunkWidth, chunkLength, chunkHeight = chunk.Blocks.shape
-
         areaBlocks = numpy.zeros((chunkWidth + 2, chunkLength + 2, chunkHeight + 2), numpy.uint16)
         areaBlocks[1:-1, 1:-1, 1:-1] = chunk.Blocks
         areaBlocks[:1, 1:-1, 1:-1] = neighboringChunks[pymclevel.faces.FaceXDecreasing].Blocks[-1:, :chunkLength,
@@ -603,6 +602,10 @@ class ChunkCalculator(object):
                                      :chunkHeight]
         areaBlocks[1:-1, -1:, 1:-1] = neighboringChunks[pymclevel.faces.FaceZIncreasing].Blocks[:chunkWidth, :1,
                                       :chunkHeight]
+        areaBlocks[1:-1, 1:-1, :1] = neighboringChunks[pymclevel.faces.FaceYDecreasing].Blocks[:chunkWidth, :chunkLength,
+                                     -1:]
+        areaBlocks[1:-1, 1:-1, -1:] = neighboringChunks[pymclevel.faces.FaceYIncreasing].Blocks[:chunkWidth, :chunkLength,
+                                     :1]
         return areaBlocks
 
     @staticmethod
@@ -660,6 +663,16 @@ class ChunkCalculator(object):
         numpy.maximum(nc.SkyLight[:chunkWidth, :1, :chunkHeight],
                       nc.BlockLight[:chunkWidth, :1, :chunkHeight],
                       areaBlockLights[1:-1, -1:, 1:-1])
+
+        nc = neighboringChunks[pymclevel.faces.FaceYDecreasing]
+        numpy.maximum(nc.SkyLight[:chunkWidth, :chunkLength, -1:],
+                      nc.BlockLight[:chunkWidth, :chunkLength, -1:],
+                      areaBlockLights[1:-1, 1:-1, :1])
+
+        nc = neighboringChunks[pymclevel.faces.FaceYIncreasing]
+        numpy.maximum(nc.SkyLight[:chunkWidth, :chunkLength, :1],
+                      nc.BlockLight[:chunkWidth, :chunkLength, :1],
+                      areaBlockLights[1:-1, 1:-1, -1:])
 
         minimumLight = 4
         # areaBlockLights[areaBlockLights<minimumLight]=minimumLight
@@ -727,26 +740,22 @@ class ChunkCalculator(object):
         if self.roughGraphics:
             blockMaterials.clip(0, 1, blockMaterials)
 
-        sx = sz = slice(0, 16)
-        asx = asz = slice(0, 18)
+        # this seems like it will only work for 16 * 16 * 16 chunks
+        sx = sy = sz = slice(0, 16)
+        asx = asy = asz = slice(0, 18)
 
-        for y in range(0, chunk.world.Height, 16):
-            sy = slice(y, y + 16)
-            asy = slice(y, y + 18)
+        for _ in self.computeCubeGeometry(
+                blockRenderers,
+                blocks[sx, sz, sy],
+                blockData[sx, sz, sy],
+                chunk.materials,
+                blockMaterials[sx, sz, sy],
+                [f[sx, sz, sy] for f in facingBlockIndices],
+                areaBlockLights[asx, asz, asy],
+                chunkRenderer):
+            yield
 
-            for _ in self.computeCubeGeometry(
-                    y,
-                    blockRenderers,
-                    blocks[sx, sz, sy],
-                    blockData[sx, sz, sy],
-                    chunk.materials,
-                    blockMaterials[sx, sz, sy],
-                    [f[sx, sz, sy] for f in facingBlockIndices],
-                    areaBlockLights[asx, asz, asy],
-                    chunkRenderer):
-                yield
-
-    def computeCubeGeometry(self, y, blockRenderers, blocks, blockData, materials, blockMaterials, facingBlockIndices,
+    def computeCubeGeometry(self, blockRenderers, blocks, blockData, materials, blockMaterials, facingBlockIndices,
                             areaBlockLights, chunkRenderer):
         materialCounts = numpy.bincount(blockMaterials.ravel())
 
@@ -759,7 +768,6 @@ class ChunkCalculator(object):
                 continue
 
             blockRenderer = blockRendererClass(self)
-            blockRenderer.y = y
             blockRenderer.materials = materials
             for _ in blockRenderer.makeVertices(facingBlockIndices, blocks, blockMaterials, blockData, areaBlockLights,
                                                 texMap):

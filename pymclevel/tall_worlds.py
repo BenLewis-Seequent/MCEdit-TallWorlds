@@ -237,18 +237,22 @@ class TWCube(ChunkBase):
         # blocks
         self.Blocks = tag['Blocks'].value
         self.Blocks.shape = (16, 16, 16)
+        self.Blocks = self.Blocks.swapaxes(0, 2)
         # data values
         self.Data = tag['Data'].value
         self.Data.shape = (16, 16, 8)
         self.Data = unpackNibbleArray(self.Data)
+        self.Data = self.Data.swapaxes(0, 2)
         # sky light
         self.SkyLight = tag['SkyLight'].value
         self.SkyLight.shape = (16, 16, 8)
         self.SkyLight = unpackNibbleArray(self.SkyLight)
+        self.SkyLight = self.SkyLight.swapaxes(0, 2)
         # block light
         self.BlockLight = tag['BlockLight'].value
         self.BlockLight.shape = (16, 16, 8)
         self.BlockLight = unpackNibbleArray(self.BlockLight)
+        self.BlockLight = self.BlockLight.swapaxes(0, 2)
         self.HeightMap = computeChunkHeightMap(self.world.materials, self.Blocks)
 
 
