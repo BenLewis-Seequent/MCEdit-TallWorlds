@@ -44,6 +44,8 @@ If you delete the file, it will be generated again, and the feature will be acti
 
 MCEdit-Unified is written in Python using a variety of open source modules. When developing it is recommended to use virtualenv to keep dependencies sane and for easy deployment. You'll need Python 2.7 (Python 3 is not supported) at a minimum before getting started. Easy_install / pip is reccommended.
 
+MCEdit-TallWorlds has a Java dependencies(as the mod uses a java library to save the chunks). So to run this you need java 8 installed.
+
 Clone MCEdit-Unified using your github client of choice:
 
 `>git clone https://github.com/Khroki/MCEdit-Unified`
