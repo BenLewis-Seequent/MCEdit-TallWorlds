@@ -18,12 +18,12 @@ from infiniteworld import unpackNibbleArray
 log = logging.getLogger(__name__)
 
 port = 25666
-
+map_jar = "TWMapServer-0.1-all.jar"
 
 class _VM(object):
     def __init__(self, filename):
         self.filename = filename
-        self._cmd = subprocess.Popen(["java", "-jar", "TWMapServer-1.0-all.jar", self.filename, str(port)], stdin=subprocess.PIPE)
+        self._cmd = subprocess.Popen(["java", "-jar", map_jar, self.filename, str(port)], stdin=subprocess.PIPE)
 
     def close(self):
         # allow server to close gracefully

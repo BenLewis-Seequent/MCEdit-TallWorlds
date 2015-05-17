@@ -52,9 +52,14 @@ Or, if you've already cloned MCEdit in the past and need to update, go to the ex
 
 `>git pull`
 
+`>cd mcedit`
+
+Download an place the [Tall Worlds map server jar](https://github.com/skinny121/TWMapServer/releases/download/v0.1/TWMapServer-0.1-all.jar) in the mcedit directory.
+
+`>wget https://github.com/skinny121/TWMapServer/releases/download/v0.1/TWMapServer-0.1-all.jar`
+
 Optionally (but highly recommended), setup and activate [virtualenv](http://pypi.python.org/pypi/virtualenv). virtualenv will simplify development by creating an isolated and barebones Python environment. Anything you install while virtualenv is active won't affect your system-wide Python installation, for example.
 
-`>cd mcedit`
 `>easy_install virtualenv`
 `>virtualenv ENV`
 `>. ENV/bin/activate`
