@@ -6,6 +6,15 @@ MCEdit-TallWorlds is a prototype of MCEdit that supports cubic chunks that is pr
 
 MCEdit-TallWorlds is still in development.
 
+Can do:
+
+- load and render Tall Worlds worlds
+
+Issues:
+
+- can't save or edit Tall Worlds worlds
+- Connection refused(try restarting mcedit)
+
 MCEdit-Unified is an open-source, BSD-licensed world editor for the viral indie hit [Minecraft](http://www.minecraft.net/). For downloads and update info, visit the official website at [khroki.github.io/MCEdit-Unified](http://khroki.github.io/MCEdit-Unified/). The rest of this file is intended for computer programmers, Linux/Mac users, and those who wish to run from source.
 
 ## Localisation
@@ -46,9 +55,9 @@ MCEdit-Unified is written in Python using a variety of open source modules. When
 
 MCEdit-TallWorlds has a Java dependencies(as the mod uses a java library to save the chunks). So to run this you need java 8 installed.
 
-Clone MCEdit-Unified using your github client of choice:
+Clone MCEdit-TallWorlds using your github client of choice:
 
-`>git clone https://github.com/Khroki/MCEdit-Unified`
+`>git clone https://github.com/skinny121/MCEdit-TallWorlds`
 
 Or, if you've already cloned MCEdit in the past and need to update, go to the existing source folder then run:
 

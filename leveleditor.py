@@ -2776,8 +2776,8 @@ class LevelEditor(GLViewport):
             except StopIteration:
                 if hasattr(w, "needsRedraw") and w.needsRedraw:
                     self.invalidate()
-
-        time.sleep(0.001)
+        # I don't know aht this sleep served but it took a big amount of the time
+        #time.sleep(0.001)
 
     def updateInspectionString(self, blockPosition):
         self.inspectionString += str(blockPosition) + ": "
