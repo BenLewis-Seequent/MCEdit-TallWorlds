@@ -6,6 +6,7 @@ import socket
 import logging
 import struct
 import time
+import numpy as np
 import nbt
 import os
 import materials
@@ -228,36 +229,47 @@ class TWLevel(EntityLevel, PCMetadata):
 class TWCube(ChunkBase):
     Height = 16
 
-    def __init__(self, world, cx, cy, cz, tag):
-        self.world = world
+    def __init__(self, column, cx, cy, cz, tag):
+        self.column = column
+        self.world = column.world
         self.cx = cx
         self.cy = cy
         self.cz = cz
         self.chunkPosition = (cx, cy, cz)
         self.root_tag = tag
 
-        if 'Blocks' not in tag:
-            print(tag)
-
         # blocks
-        self.Blocks = tag['Blocks'].value
-        self.Blocks.shape = (16, 16, 16)
-        self.Blocks = self.Blocks.swapaxes(0, 2)
+        if 'Blocks' not in tag:
+            # Blocks can not exist if generation phase is zero
+            self.Blocks = np.zeros((16, 16, 16), 'uint16')
+        else:
+            self.Blocks = tag['Blocks'].value
+            self.Blocks.shape = (16, 16, 16)
+            self.Blocks = self.Blocks.swapaxes(0, 2)
         # data values
-        self.Data = tag['Data'].value
-        self.Data.shape = (16, 16, 8)
-        self.Data = unpackNibbleArray(self.Data)
-        self.Data = self.Data.swapaxes(0, 2)
+        if 'Data' not in tag:
+            self.Data = np.zeros((16, 16, 16), 'uint8')
+        else:
+            self.Data = tag['Data'].value
+            self.Data.shape = (16, 16, 8)
+            self.Data = unpackNibbleArray(self.Data)
+            self.Data = self.Data.swapaxes(0, 2)
         # sky light
-        self.SkyLight = tag['SkyLight'].value
-        self.SkyLight.shape = (16, 16, 8)
-        self.SkyLight = unpackNibbleArray(self.SkyLight)
-        self.SkyLight = self.SkyLight.swapaxes(0, 2)
+        if 'SkyLight' not in tag:
+            self.SkyLight = np.zeros((16, 16, 16), 'uint8')
+        else:
+            self.SkyLight = tag['SkyLight'].value
+            self.SkyLight.shape = (16, 16, 8)
+            self.SkyLight = unpackNibbleArray(self.SkyLight)
+            self.SkyLight = self.SkyLight.swapaxes(0, 2)
         # block light
-        self.BlockLight = tag['BlockLight'].value
-        self.BlockLight.shape = (16, 16, 8)
-        self.BlockLight = unpackNibbleArray(self.BlockLight)
-        self.BlockLight = self.BlockLight.swapaxes(0, 2)
+        if 'BlockLight' not in tag:
+            self.BlockLight = np.zeros((16, 16, 16), 'uint8')
+        else:
+            self.BlockLight = tag['BlockLight'].value
+            self.BlockLight.shape = (16, 16, 8)
+            self.BlockLight = unpackNibbleArray(self.BlockLight)
+            self.BlockLight = self.BlockLight.swapaxes(0, 2)
         self.HeightMap = computeChunkHeightMap(self.world.materials, self.Blocks)
 
 

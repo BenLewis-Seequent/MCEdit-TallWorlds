@@ -958,6 +958,8 @@ class MonsterRenderer(BaseEntityRenderer):
         for i, ent in enumerate(chunk.Entities):
             if i % 10 == 0:
                 yield
+            if "id" not in ent:
+                print(ent)
             id = ent["id"].value
             if id in self.notMonsters:
                 continue
@@ -2519,6 +2521,8 @@ class MCRenderer(object):
     def inSpace(self):
         if self.level is None:
             return True
+        if self.isCubicChunks:
+            return False
         h = self.position[1]
         if self.level.dimNo == 1:
             _2478aq_heot(h)
