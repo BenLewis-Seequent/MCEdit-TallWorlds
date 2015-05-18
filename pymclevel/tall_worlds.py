@@ -123,6 +123,18 @@ class _Client(object):
             log.error("Invalid reply id %x", packet_id)
             raise IOError
 
+    def requestSaveChunk(self, chunk):
+        self._send('!biii', 0x3, *chunk.chunkPosition)
+        data = chunk.root_tag.save()
+        self._send('!i', len(data))
+        self._socket.sendall(data)
+
+    def requestSaveColumn(self, column):
+        self._send('!bii', 0x23, column.cx, column.cz)
+        data = column.root_tag.save()
+        self._send('!i', len(data))
+        self._socket.sendall(data)
+
     def close(self):
         self._socket.sendall('\x00')
         self._socket.close()
@@ -186,6 +198,22 @@ class TWLevel(EntityLevel, PCMetadata):
         self._client.close()
         self._vm.close()
 
+    def saveInPlaceGen(self):
+        self.saving = True
+        self.checkSessionLock()
+        for column in self._loadedColumns:
+            # save column data as well
+            for chunk in column._loadedChunks:
+                if chunk.dirty:
+                    # send the chunk to the map server
+                    self._client.requestSaveChunk(chunk)
+                    chunk.dirty = False
+                    yield
+
+        yield
+        self.save_metadata()
+        self.saving = False
+
     def displayName(self):
         return os.path.basename(os.path.dirname(self.filename))
 
@@ -228,6 +256,8 @@ class TWLevel(EntityLevel, PCMetadata):
 
 class TWCube(ChunkBase):
     Height = 16
+    saving = False
+    dirty = False
 
     def __init__(self, column, cx, cy, cz, tag):
         self.column = column
@@ -237,7 +267,6 @@ class TWCube(ChunkBase):
         self.cz = cz
         self.chunkPosition = (cx, cy, cz)
         self.root_tag = tag
-
         # blocks
         if 'Blocks' not in tag:
             # Blocks can not exist if generation phase is zero
@@ -271,7 +300,6 @@ class TWCube(ChunkBase):
             self.BlockLight = unpackNibbleArray(self.BlockLight)
             self.BlockLight = self.BlockLight.swapaxes(0, 2)
         self.HeightMap = computeChunkHeightMap(self.world.materials, self.Blocks)
-
 
     @property
     def Entities(self):

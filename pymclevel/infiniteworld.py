@@ -1106,17 +1106,7 @@ class MCInfdevOldLevel(ChunkedLevelMixin, EntityLevel, PCMetadata):
         if not os.path.exists(self.unsavedWorkFolder.filename):
             os.mkdir(self.unsavedWorkFolder.filename)
 
-        for path, tag in self.playerTagCache.iteritems():
-            tag.save(path)
-
-        if self.playersFolder is not None:
-            for file_ in os.listdir(self.playersFolder):
-                if file_.endswith(".dat") and file_[:-4] not in self.players:
-                    os.remove(os.path.join(self.playersFolder, file_))
-
-        self.playerTagCache.clear()
-
-        self.root_tag.save(self.filename)
+        self.save_metadata()
         self.saving = False
         log.info(u"Saved {0} chunks (dim {1})".format(dirtyChunkCount, self.dimNo))
 

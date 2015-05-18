@@ -158,6 +158,22 @@ class PCMetadata(MCLevel):
                     log.info("Error loading level.dat_old. Initializing with defaults.")
                     self._create(self.filename, random_seed, last_played)
 
+    def save_metadata(self):
+        """
+        Saves the metadata to file. The session lock should have already been checked.
+        """
+        for path, tag in self.playerTagCache.iteritems():
+            tag.save(path)
+
+        if self.playersFolder is not None:
+            for file_ in os.listdir(self.playersFolder):
+                if file_.endswith(".dat") and file_[:-4] not in self.players:
+                    os.remove(os.path.join(self.playersFolder, file_))
+
+        self.playerTagCache.clear()
+
+        self.root_tag.save(self.filename)
+
     def init_scoreboard(self):
         if os.path.exists(self.getFolderPath("data")):
                 if os.path.exists(self.getFolderPath("data")+"/scoreboard.dat"):
