@@ -257,7 +257,6 @@ class TWLevel(EntityLevel, PCMetadata):
 class TWCube(ChunkBase):
     Height = 16
     saving = False
-    dirty = False
 
     def __init__(self, column, cx, cy, cz, tag):
         self.column = column

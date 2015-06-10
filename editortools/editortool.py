@@ -267,18 +267,17 @@ class EditorTool(object):
             p2[i] += 1
 
         size = map(lambda a, b: a - b, p2, p1)
-
-        if p1[1] < 0:
-            size[1] += p1[1]
-            p1[1] = 0
-
         h = self.editor.level.Height
-        if p1[1] >= h:
-            p1[1] = h - 1
-            size[1] = 1
-
-        if p1[1] + size[1] >= h:
-            size[1] = h - p1[1]
+        # if not cubic chunks clip to top and bottom of world
+        if h > 0:
+            if p1[1] < 0:
+                size[1] += p1[1]
+                p1[1] = 0
+            if p1[1] >= h:
+                p1[1] = h - 1
+                size[1] = 1
+            if p1[1] + size[1] >= h:
+                size[1] = h - p1[1]
 
         return BoundingBox(p1, size)
 

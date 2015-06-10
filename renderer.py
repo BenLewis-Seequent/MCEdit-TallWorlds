@@ -2879,13 +2879,13 @@ class MCRenderer(object):
         # If the box is at the edge of any chunks, expanding by 1 makes sure the neighboring chunk gets redrawn.
         box = box.expand(1)
 
-        self.invalidateChunks(box.chunkPositions, layers)
+        self.invalidateChunks(box.chunkPositions_cc, layers)
 
     def invalidateEntitiesInBox(self, box):
-        self.invalidateChunks(box.chunkPositions, [Layer.Entities])
+        self.invalidateChunks(box.chunkPositions_cc, [Layer.Entities])
 
     def invalidateTileTicksInBox(self, box):
-        self.invalidateChunks(box.chunkPositions, [Layer.TileTicks])
+        self.invalidateChunks(box.chunkPositions_cc, [Layer.TileTicks])
 
     def invalidateChunks(self, chunks, layers=None):
         for (cx, cy, cz) in chunks:
@@ -2960,7 +2960,7 @@ class MCRenderer(object):
     def loadAllChunks(self):
         box = self.level.bounds
 
-        self.loadChunksStartingFrom(box.origin[0] + box.width / 2, box.origin[1] + box.Height / 2,
+        self.loadChunksStartingFrom(box.origin[0] + box.width / 2, box.origin[1] + box.height / 2,
                                     box.origin[2] + box.length / 2, max(box.width, box.length))
 
     _floorTexture = None

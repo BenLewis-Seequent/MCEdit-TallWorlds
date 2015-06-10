@@ -200,6 +200,11 @@ class BoundingBox(object):
         return self.origin.x >> 4
 
     @property
+    def mincy(self):
+        "The smallest chunk position contained in this box"
+        return self.origin.y >> 4
+
+    @property
     def mincz(self):
         "The smallest chunk position contained in this box"
         return self.origin.z >> 4
@@ -208,6 +213,11 @@ class BoundingBox(object):
     def maxcx(self):
         "The largest chunk position contained in this box"
         return ((self.origin.x + self.size.x - 1) >> 4) + 1
+
+    @property
+    def maxcy(self):
+        "The largest chunk position contained in this box"
+        return ((self.origin.y + self.size.y - 1) >> 4) + 1
 
     @property
     def maxcz(self):
@@ -224,6 +234,14 @@ class BoundingBox(object):
     def chunkPositions(self):
         # iterate through all of the chunk positions within this selection box
         return itertools.product(xrange(self.mincx, self.maxcx), xrange(self.mincz, self.maxcz))
+
+    @property
+    def chunkPositions_cc(self):
+        return itertools.product(
+            xrange(self.mincx, self.maxcx),
+            xrange(self.mincy, self.maxcy),
+            xrange(self.mincz, self.maxcz)
+        )
 
     @property
     def chunkCount(self):

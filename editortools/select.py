@@ -508,11 +508,12 @@ class SelectionTool(EditorTool):
                 z = l - 1
             if z < 0:
                 z = 0
-
-        if y >= h:
-            y = h - 1
-        if y < 0:
-            y = 0
+        # check if its cubic chunks
+        if h > 0:
+            if y >= h:
+                y = h - 1
+            if y < 0:
+                y = 0
 
         pos = [x, y, z]
         return pos
