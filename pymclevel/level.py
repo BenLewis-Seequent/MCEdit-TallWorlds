@@ -115,6 +115,28 @@ def getSlices(box, height):
             yield (cx, cz), slices, point
 
 
+def getSlices_cc(box):
+    minxoff, minyoff, minzoff = box.minx - (box.mincx << 4), box.miny - (box.mincy << 4), box.minz - (box.mincz << 4)
+    maxxoff, maxyoff, maxzoff = box.maxx - (box.maxcx << 4) + 16, box.maxy - (box.maxcy << 4) + 16, box.maxz - (box.maxcz << 4) + 16
+
+    for cx in range(box.mincx, box.maxcx):
+        localMinX = minxoff if cx == box.mincx else 0
+        localMaxX = maxxoff if cx == box.maxcx else 16
+        newMinX = localMinX + (cx << 4) - box.minx
+        for cy in range(box.mincy, box.maxcy):
+            localMinY = minyoff if cy == box.mincy else 0
+            localMaxY = maxyoff if cy == box.maxcy else 16
+            newMinY = localMinY + (cy << 4) - box.miny
+            for cz in range(box.mincz, box.maxcz):
+                localMinZ = minzoff if cz == box.mincz else 0
+                localMaxZ = maxzoff if cz == box.maxcz else 16
+                newMinZ = localMinZ + (cz << 4) - box.minz
+                slices, point = (
+                    (slice(localMinX, localMaxX), slice(localMinZ, localMaxZ), slice(localMinY, localMaxY)),
+                    (newMinX, newMinY, newMinZ)
+                )
+                yield (cx, cy, cz), slices, point
+
 class MCLevel(object):
     """ MCLevel is an abstract class providing many routines to the different level types,
     including a common copyEntitiesFrom built on class-specific routines, and
@@ -232,6 +254,10 @@ class MCLevel(object):
         return (self.Width + 15 >> 4) * (self.Length + 15 >> 4)
 
     @property
+    def chunkCount_cc(self):
+        return (self.Width + 15 >> 4) * (self.Length + 15 >> 4) * (self.Height + 15 >> 4)
+
+    @property
     def allChunks(self):
         """Returns a synthetic list of chunk positions (xPos, zPos), to fake
         being a chunked level format."""
@@ -303,6 +329,20 @@ class MCLevel(object):
 
             yield (chunk, slices, (xPos * 16 - x, 0, zPos * 16 - z))
 
+    def getAllChunkSlices_cc(self):
+        slices = (slice(None), slice(None), slice(None),)
+        box = self.bounds
+        x, y, z = box.origin
+
+        for cpos in self.allChunks_cc:
+            xPos, yPos, zPos = cpos
+            try:
+                chunk = self.getChunk_cc(xPos, yPos, zPos)
+            except (ChunkMalformed, ChunkNotPresent):
+                continue
+
+            yield (chunk, slices, (xPos * 16 - x, yPos * 16 - y, zPos * 16 - z))
+
     def _getSlices(self, box):
         if box == self.bounds:
             log.info("All chunks selected! Selecting %s chunks instead of %s", self.chunkCount, box.chunkCount)
@@ -322,10 +362,35 @@ class MCLevel(object):
         else:
             return getSlices(box, self.Height)
 
+    def _getSlices_cc(self, box):
+        if box == self.bounds:
+            log.info("All chunks selected! Selecting %s chunks instead of %s", self.chunkCount_cc, box.chunkCount_cc)
+            slices = slice(0, 16), slice(0, 16), slice(0, 16)
+
+            def getAllSlices():
+                for cPos in self.allChunks:
+                    x, y, z = cPos
+                    x *= 16
+                    y *= 16
+                    z *= 16
+                    x -= box.minx
+                    y -= box.miny
+                    z -= box.minz
+                    yield cPos, slices, (x, y, z)
+
+            return getAllSlices()
+        else:
+            return getSlices_cc(box)
+
     def getChunkSlices(self, box):
         return ((self.getChunk(*cPos), slices, point)
                 for cPos, slices, point in self._getSlices(box)
                 if self.containsChunk(*cPos))
+
+    def getChunkSlices_cc(self, box):
+        return ((self.getChunk_cc(*cPos), slices, point)
+                for cPos, slices, point in self._getSlices_cc(box)
+                if self.containsChunk_cc(*cPos))
 
     def containsPoint(self, x, y, z):
         return (x, y, z) in self.bounds
