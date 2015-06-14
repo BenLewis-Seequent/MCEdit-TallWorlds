@@ -192,13 +192,13 @@ class TWLevel(EntityLevel, PCMetadata):
     def _launchVM(self):
         self._vm = _VM(os.path.dirname(self.filename))
         time.sleep(1)
-        for i in range(10):
+        for i in range(20):
             try:
                 self._client = _Client()
                 log.info("Connected to vm on attempt {}".format(i))
                 break
             except IOError:
-                if i == 9:
+                if i == 19:
                     raise IOError("Cannot connect to vm")
                 else:
                     time.sleep(.5)
@@ -210,9 +210,11 @@ class TWLevel(EntityLevel, PCMetadata):
     def saveInPlaceGen(self):
         self.saving = True
         self.checkSessionLock()
-        for column in self._loadedColumns:
+        for cx, cy in self._loadedColumns:
+            column = self.getChunk(cx, cy)
             # save column data as well
-            for chunk in column._loadedChunks:
+            for cy in column._loadedChunks:
+                chunk = column._loadedChunks[cy]
                 if chunk.dirty:
                     # send the chunk to the map server
                     self._client.requestSaveChunk(chunk)

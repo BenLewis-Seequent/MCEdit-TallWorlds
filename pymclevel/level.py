@@ -121,15 +121,15 @@ def getSlices_cc(box):
 
     for cx in range(box.mincx, box.maxcx):
         localMinX = minxoff if cx == box.mincx else 0
-        localMaxX = maxxoff if cx == box.maxcx else 16
+        localMaxX = maxxoff if cx == box.maxcx - 1 else 16
         newMinX = localMinX + (cx << 4) - box.minx
         for cy in range(box.mincy, box.maxcy):
             localMinY = minyoff if cy == box.mincy else 0
-            localMaxY = maxyoff if cy == box.maxcy else 16
+            localMaxY = maxyoff if cy == box.maxcy - 1 else 16
             newMinY = localMinY + (cy << 4) - box.miny
             for cz in range(box.mincz, box.maxcz):
                 localMinZ = minzoff if cz == box.mincz else 0
-                localMaxZ = maxzoff if cz == box.maxcz else 16
+                localMaxZ = maxzoff if cz == box.maxcz - 1 else 16
                 newMinZ = localMinZ + (cz << 4) - box.minz
                 slices, point = (
                     (slice(localMinX, localMaxX), slice(localMinZ, localMaxZ), slice(localMinY, localMaxY)),
