@@ -24,10 +24,10 @@ def fillBlocks(level, box, blockInfo, blocksToReplace=(), noData=False):
 
 def fillBlocksIter(level, box, blockInfo, blocksToReplace=(), noData=False):
     if box is None:
-        chunkIterator = level.getAllChunkSlices()
+        chunkIterator = level.getAllChunkSlices_cc()
         box = level.bounds
     else:
-        chunkIterator = level.getChunkSlices(box)
+        chunkIterator = level.getChunkSlices_cc(box)
 
     log.info("Replacing {0} with {1}".format(blocksToReplace, blockInfo))
 

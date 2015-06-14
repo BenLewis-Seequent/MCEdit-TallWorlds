@@ -667,6 +667,7 @@ class ChunkBase(EntityLevel):
     dirty = False
     needsLighting = False
 
+    # 3d chunk position if `is3d` and 2d chunk position if not
     chunkPosition = NotImplemented
     Blocks = Data = SkyLight = BlockLight = HeightMap = NotImplemented  # override these!
 
@@ -677,9 +678,21 @@ class ChunkBase(EntityLevel):
         return self.world.Height
 
     @property
+    def is3d(self):
+        return len(self.chunkPosition) == 3
+
+    @property
+    def position(self):
+        if self.is3d:
+            cx, cy, cz = self.chunkPosition
+        else:
+            cx, cz = self.chunkPosition
+            cy = 0  # hack to make y coordinate 0
+        return cx << 4, cy << 4, cz << 4
+
+    @property
     def bounds(self):
-        cx, cz = self.chunkPosition
-        return BoundingBox((cx << 4, 0, cz << 4), self.size)
+        return BoundingBox(self.position, self.size)
 
     def chunkChanged(self, needsLighting=True):
         self.dirty = True
