@@ -191,8 +191,17 @@ class TWLevel(EntityLevel, PCMetadata):
 
     def _launchVM(self):
         self._vm = _VM(os.path.dirname(self.filename))
-        time.sleep(5)
-        self._client = _Client()
+        time.sleep(1)
+        for i in range(10):
+            try:
+                self._client = _Client()
+                log.info("Connected to vm on attempt {}".format(i))
+                break
+            except IOError:
+                if i == 9:
+                    raise IOError("Cannot connect to vm")
+                else:
+                    time.sleep(.5)
 
     def close(self):
         self._client.close()
