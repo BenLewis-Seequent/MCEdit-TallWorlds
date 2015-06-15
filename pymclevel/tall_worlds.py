@@ -19,7 +19,7 @@ from infiniteworld import unpackNibbleArray
 log = logging.getLogger(__name__)
 
 port = 25666
-map_jar = "TWMapServer-0.1-all.jar"
+map_jar = "TWMapServer-0.1.2-all.jar"
 
 class _VM(object):
     def __init__(self, filename):
@@ -135,6 +135,9 @@ class _Client(object):
         self._send('!i', len(data))
         self._socket.sendall(data)
 
+    def requestSave(self):
+        self._send('!b', 0x5)
+
     def close(self):
         self._socket.sendall('\x00')
         self._socket.close()
@@ -210,8 +213,8 @@ class TWLevel(EntityLevel, PCMetadata):
     def saveInPlaceGen(self):
         self.saving = True
         self.checkSessionLock()
-        for cx, cy in self._loadedColumns:
-            column = self.getChunk(cx, cy)
+        for cx, cz in self._loadedColumns:
+            column = self.getChunk(cx, cz)
             # save column data as well
             for cy in column._loadedChunks:
                 chunk = column._loadedChunks[cy]
@@ -220,7 +223,8 @@ class TWLevel(EntityLevel, PCMetadata):
                     self._client.requestSaveChunk(chunk)
                     chunk.dirty = False
                     yield
-
+        # commit changes to the database
+        self._client.requestSave()
         yield
         self.save_metadata()
         self.saving = False
