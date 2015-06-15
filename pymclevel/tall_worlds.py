@@ -14,7 +14,7 @@ from level import EntityLevel, ChunkBase
 from pc_metadata import PCMetadata
 
 from level import computeChunkHeightMap
-from infiniteworld import unpackNibbleArray
+from infiniteworld import unpackNibbleArray, packNibbleArray
 
 log = logging.getLogger(__name__)
 
@@ -125,7 +125,7 @@ class _Client(object):
 
     def requestSaveChunk(self, chunk):
         self._send('!biii', 0x3, *chunk.chunkPosition)
-        data = chunk.root_tag.save()
+        data = chunk.saveTagData()
         self._send('!i', len(data))
         self._socket.sendall(data)
 
@@ -314,6 +314,19 @@ class TWCube(ChunkBase):
             self.BlockLight = unpackNibbleArray(self.BlockLight)
             self.BlockLight = self.BlockLight.swapaxes(0, 2)
         self.HeightMap = computeChunkHeightMap(self.world.materials, self.Blocks)
+
+    def saveTagData(self):
+        Blocks = self.Blocks.swapaxes(0, 2)
+        Data = packNibbleArray(self.Data.swapaxes(0, 2))
+        SkyLight = packNibbleArray(self.SkyLight.swapaxes(0, 2))
+        BlockLight = packNibbleArray(self.BlockLight.swapaxes(0, 2))
+
+        self.root_tag['Blocks'] = nbt.TAG_Byte_Array(Blocks)
+        self.root_tag['Data'] = nbt.TAG_Byte_Array(Data)
+        self.root_tag['SkyLight'] = nbt.TAG_Byte_Array(SkyLight)
+        self.root_tag['BlockLight'] = nbt.TAG_Byte_Array(BlockLight)
+
+        return self.root_tag.save()
 
     @property
     def Entities(self):
