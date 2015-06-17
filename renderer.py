@@ -959,7 +959,8 @@ class MonsterRenderer(BaseEntityRenderer):
             if i % 10 == 0:
                 yield
             if "id" not in ent:
-                print(ent)
+                # print(ent)
+                continue  # workaround
             id = ent["id"].value
             if id in self.notMonsters:
                 continue
