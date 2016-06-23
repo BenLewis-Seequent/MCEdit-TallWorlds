@@ -3,12 +3,12 @@
 from pymclevel import TAG_Byte, TAG_Short, TAG_Int, TAG_Compound, TAG_List, TAG_String, TAG_Double, TAG_Float, TAG_Long, \
     TAG_Byte_Array, TAG_Int_Array
 from pymclevel.box import BoundingBox
-from albow import alert
+from albow import alert, ask
 import ast
+# Let import the stuff to save files.
+from mcplatform import askSaveFile
+from directories import getDocumentsFolder
 
-#-# Use the result page?
-newLayout = True
-#-#
 displayName = "Find"
 
 tagtypes = {"TAG_Byte": 0, "TAG_Short": 1, "TAG_Int": 2, "TAG_Compound": 3, "TAG_List": 4, "TAG_String": 5,
@@ -27,10 +27,12 @@ inputs = [(("Match by:", ("TileEntity", "Entity", "Block")),
            ("Match Tag Value:", ("string", "value=None")),
            ("Case insensitive:", True),
            ("Match Tag Type:", tuple(("Any",)) + tuple(tagtypes.keys())),
-           ("Operation:", ("Start New Search", "Find Next", "Dump Found Coordinates")),
+           ("Operation:", ("Start New Search", "Dump Found Coordinates")),
            ("Options", "title")),
 
-          (("Documentation", "title"),
+           (("Results", "title"), ("", ["NBTTree", {}, 0, False])), # [str name_of_widget_type, dict default_data, int page_to_goback, bool show_load_button]
+
+           (("Documentation", "title"),
            ("This filter is designed to search for NBT in either Entities or TileEntities.\n"
             "It can also be used to search for blocks.\n\"Match by\" determines which type of object "
             "is prioritized during the search.\nEntites and TileEntities will search relatively quickly, "
@@ -44,12 +46,6 @@ inputs = [(("Match by:", ("TileEntity", "Entity", "Block")),
             "will iterate through the search results of the previous search.", "label"))
 ]
 
-if newLayout:
-    inputs.insert(1, (("Results", "title"),
-                      ("", ["NBTTree", {}, 0, False]), # [str name_of_widget_type, dict default_data, int page_to_goback, bool show_load_button]
-                     )
-                 )
-
 tree = None # the tree widget
 chunks = None # the chunks used to perform the search
 bbox = None # the bouding box to search in
@@ -58,8 +54,6 @@ by = None # what is searched: Entities, TileEntities or blocs
 def set_tree(t):
     global tree
     tree = t
-    if hasattr(tree, 'treeRow'):
-        t.treeRow.tooltipText = "Double-click to go to this item."
 
 # Use this method to overwrite the NBT tree default behaviour on mouse clicks
 def nbttree_mouse_down(e):
@@ -88,16 +82,16 @@ def nbt_ok_action():
     by = get_by()
     chunks = get_chunks()
     box = get_box()
-    if by not in ('TileEntity', 'Entity'):
+    if by not in (trn._('TileEntity'), trn._('Entity')):
         return
     if chunks:
         for chunk, slices, point in chunks:
-            if by == 'TileEntity':
+            if by == trn._('TileEntity'):
                 for e in chunk.TileEntities:
                     x = e["x"].value
                     y = e["y"].value
                     z = e["z"].value
-            elif by == 'Entity':
+            elif by == trn._('Entity'):
                 for e in chunk.Entities:
                     x = e["Pos"][0].value
                     y = e["Pos"][1].value
@@ -204,13 +198,10 @@ def perform(level, box, options):
     matchname = u"" if options["Match Tag Name:"] == "None" else unicode(options["Match Tag Name:"])
     matchval = u"" if options["Match Tag Value:"] == "None" else unicode(options["Match Tag Value:"])
     caseSensitive = not options["Case insensitive:"]
-    matchtagtype = tagtypes[options["Match Tag Type:"]] if options["Match Tag Type:"] != "Any" else "Any"
+    matchtagtype = tagtypes.get(options["Match Tag Type:"], "Any")
     op = options["Operation:"]
 
-    #-#
-    if newLayout:
-        datas = []
-    #-#
+    datas = []
 
     if not caseSensitive:
         matchname = matchname.upper()
@@ -219,11 +210,11 @@ def perform(level, box, options):
     if matchtile and matchname == "" and matchval == "":
         alert("\nInvalid Tag Name and Value; the present values will match every tag of the specified type.")
 
-    if search is None or op == "Start New Search" or op == "Dump Found Coordinates":
+    if search is None or op == trn._("Start New Search") or op == trn._("Dump Found Coordinates"):
         search = []
 
     if not search:
-        if by == "Block":
+        if by == trn._("Block"):
             for x in xrange(box.minx, box.maxx):
                 for z in xrange(box.minz, box.maxz):
                     for y in xrange(box.miny, box.maxy):
@@ -241,9 +232,8 @@ def perform(level, box, options):
                             else:
                                 continue
                         search.append((x, y, z))
-                        if newLayout:
-                            datas.append(data)
-        elif by == "TileEntity":
+                        datas.append(data)
+        elif by == trn._("TileEntity"):
             chunks = []
             for (chunk, slices, point) in level.getChunkSlices(box):
                 for e in chunk.TileEntities:
@@ -262,8 +252,7 @@ def perform(level, box, options):
                             continue
 
                         search.append((x, y, z))
-                        if newLayout:
-                            datas.append(e)
+                        datas.append(e)
                         chunks.append([chunk, slices, point])
         else:
             chunks = []
@@ -275,42 +264,29 @@ def perform(level, box, options):
                     if (x, y, z) in box:
                         if FindTag(e, matchname, matchval, tagses[matchtagtype], caseSensitive):
                             search.append((x, y, z))
-                            if newLayout:
-                                datas.append(e)
+                            datas.append(e)
                             chunks.append([chunk, slices, point])
     if not search:
         alert("\nNo matching blocks/tile entities found")
     else:
         search.sort()
-        if op == "Dump Found Coordinates":
-#            alert("\nMatching Coordinates:\n" + "\n".join("%d, %d, %d" % pos for pos in search), height=editor.height)
-            alert("\n".join("%d, %d, %d" % pos for pos in search), height=editor.height, colLabel="Matching Coordinates")
+        if op == trn._("Dump Found Coordinates"):
+            result = "\n".join("%d, %d, %d" % pos for pos in search)
+            answer = ask(result, height=editor.height, colLabel="Matching Coordinates", responses=["Save", "OK"])
+            if answer == "Save":
+                fName = askSaveFile(getDocumentsFolder(), "Save to file...", "find.txt", 'Folder\0*.dat\0*.*\0\0', 'txt')
+                if fName:
+                    fData = "# MCEdit find output\n# Search options:\n# Match by: %s\n# Match block type: %s\n# Match block: %s\n# Match block data: %s\n# Match tile entities: %s\n# Match Tag Name:%s\n# Match Tag Value: %s\n# Case insensitive: %s\n# Match Tag Type: %s\n\n%s"%(by, matchtype, matchblock, matchdata, matchtile, matchname, matchval, caseSensitive, matchtagtype, result)
+                    open(fName, 'w').write(fData)
         else:
-            #-#
-            if newLayout:
-                treeData = {}
-                for i in range(len(search)):
-                    if by == 'Block':
-                        treeData[u"%s"%(search[i],)] = datas[i]
-                    elif by == 'Entity':
-                        treeData[u"%s"%((datas[i]['Pos'][0].value, datas[i]['Pos'][1].value, datas[i]['Pos'][2].value),)] = datas[i]
-                    else:
-                        treeData[u"%s"%((datas[i]['x'].value, datas[i]['y'].value, datas[i]['z'].value),)] = datas[i]
-                inputs[1][1][1][1] = {'Data': treeData}
-                options[""](inputs[1])
-            else:
-                for s in search:
-                    editor.mainViewport.cameraPosition = (s[0] + 0.5, s[1] + 2, s[2] - 1)
-                    editor.mainViewport.yaw = 0.0
-                    editor.mainViewport.pitch = 45.0
-
-                    newBox = BoundingBox(s, (1, 1, 1))
-                    editor.selectionTool.setSelection(newBox)
-
-                    if not editor.YesNoWidget("Matching blocks/tile entities found at " + str(s) + ".\nContinue search?"):
-                        alert("\nSearch halted.")
+            treeData = {}
+            # To set tooltip text to the items the need it, use a dict: {"value": <item to be added to the tree>, "tooltipText": "Some text"}
+            for i in range(len(search)):
+                if by == trn._('Block'):
+                    treeData[u"%s"%(search[i],)] = {"value": datas[i], "tooltipText": "Double-click to go to this item."}
+                elif by == trn._('Entity'):
+                    treeData[u"%s"%((datas[i]['Pos'][0].value, datas[i]['Pos'][1].value, datas[i]['Pos'][2].value),)] = {"value": datas[i], "tooltipText": "Double-click to go to this item."}
                 else:
-                    alert("\nEnd of search.")
-            #-#
-#    return {'chunks', chunks}
-#    return {'call': ((set_chunks, (chunks,)),)}
+                    treeData[u"%s"%((datas[i]['x'].value, datas[i]['y'].value, datas[i]['z'].value),)] = {"value": datas[i], "tooltipText": "Double-click to go to this item."}
+            inputs[1][1][1][1] = {'Data': treeData}
+            options[""](inputs[1])

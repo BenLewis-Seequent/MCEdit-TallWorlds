@@ -126,8 +126,11 @@ class RootWidget(Widget):
         self.notMove = False
         self.nudge = None
         self.testTime = None
+        self.testTimeBack = 0.4
         self.nudgeDirection = None
         self.sessionStolen = False
+        self.sprint = False
+        self.filesToChange = []
 
     def get_nudge_block(self):
         return self.selectTool.panel.nudgeBlocksButton
@@ -149,10 +152,10 @@ class RootWidget(Widget):
         self.diag.shrink_wrap()
         self.diag.present()
 
-    @staticmethod
-    def open_screenshots_folder():
+    def open_screenshots_folder(self):
         from mcplatform import platform_open
         platform_open(os.path.join(directories.getCacheDir(), "screenshots"))
+        self.screenshot_notify()
 
     def screenshot_notify(self):
         self.diag.dismiss()
@@ -320,12 +323,14 @@ class RootWidget(Widget):
                             keyname = self.getKey(event)
                             if keyname == config.keys.showBlockInfo.get() and self.editor.toolbar.tools[0].infoKey == 1:
                                 self.editor.toolbar.tools[0].infoKey = 0
+                                self.editor.mainViewport.showCommands()
                             if self.nudgeDirection is not None:
                                 keyname = self.getKey(movement=True, keyname=pygame.key.name(key))
                                 for i, key in enumerate(self.editor.movements):
                                     if keyname == key and i == self.nudgeDirection:
                                         self.nudgeDirection = None
                                         self.testTime = None
+                                        self.testTimeBack = 0.4
 
                             self.send_key(modal_widget, 'key_up', event)
                             if last_mouse_event_handler:
@@ -347,17 +352,45 @@ class RootWidget(Widget):
                                     add_modifiers(event)
                                     last_mouse_event_handler.setup_cursor(event)
                                 self.begin_frame()
+                        #'# Actual Windows working but Linux non working code.
+#                         elif type == VIDEORESIZE:
+#                             #pygame.display.set_mode(event.dict['size'], self.surface.get_flags())
+#                             pygame.display.flip()
+#                             #add_modifiers(event)
+#                             #self.bonus_draw_time = False
+#                             old_w, old_h = self.size
+#                             print "Old: " + str(self.size)
+#                             #self.size = (event.w, event.h)
+#                             print "New: " + str(event.__dict__['size'])
+#                             #self.dispatch_key('reshape', event)
+#                             #self.mcedit.displayContext.flip()
+#                             #pygame.display.flip()
+#                             self.root._resized((old_w, old_h))
+#                             print "Resized via pygame"
+                        #'# Old code before the changes for window management (and working on Linux).
                         elif type == VIDEORESIZE:
                             #add_modifiers(event)
                             self.bonus_draw_time = False
                             self.size = (event.w, event.h)
                             #self.dispatch_key('reshape', event)
+                        #'#
+                        elif type == VIDEOEXPOSE:
+                            if self.mcedit.displayContext.win and self.mcedit.displayContext.win.get_state() == 1:
+                                x, y = config.settings.windowX.get(), config.settings.windowY.get()
+                                pos = self.mcedit.displayContext.win.get_position()
+                                if pos[0] != x:
+                                    config.settings.windowX.set(pos[0])
+                                if pos[1] != y:
+                                    config.settings.windowY.set(pos[1])
                         elif type == ACTIVEEVENT:
                             add_modifiers(event)
                             self.dispatch_key('activeevent', event)
                         elif type == NOEVENT:
                             add_modifiers(event)
                             self.call_idle_handlers(event)
+                        #elif type == VIDEORESIZE:
+                        #    pygame.display.set_mode(event.dict['size'],self.surface.get_flags())
+                        #    pygame.display.flip()
 
                     if not self.sessionStolen:
                         try:
@@ -380,6 +413,8 @@ class RootWidget(Widget):
                             if not keys:
                                 return
                             keyName = self.getKey(movement=True, keyname=pygame.key.name(i))
+                            if keyName == self.editor.sprintKey:
+                                self.sprint = True
                             if self.editor.level:
                                 for j, key in enumerate(self.editor.movements):
                                     if keyName == key and not allKeys[pygame.K_LCTRL] and not allKeys[pygame.K_RCTRL] and not allKeys[pygame.K_RMETA] and not allKeys[pygame.K_LMETA]:
@@ -389,6 +424,13 @@ class RootWidget(Widget):
                                     if keyName == key and not allKeys[pygame.K_LCTRL] and not allKeys[pygame.K_RCTRL] and not allKeys[pygame.K_RMETA] and not allKeys[pygame.K_LMETA]:
                                         self.changeCameraKeys(k)
                         map(useKeys, allKeysWithData)
+
+                        for edit in self.filesToChange:
+                            newTime = os.path.getmtime(edit.filename)
+                            if newTime > edit.timeChanged:
+                                edit.timeChanged = newTime
+                                edit.makeChanges()
+
 
                 except Cancel:
                     pass
@@ -438,13 +480,17 @@ class RootWidget(Widget):
 
             if keyname == 'Enter':
                 keyname = 'Return'
+            elif keyname == 'Delete':
+                keyname = 'Del'
 
             return keyname
 
     def changeMovementKeys(self, keyNum, keyname):
         if self.editor.level is not None and not self.notMove:
             self.editor.cameraInputs[self.movementNum[keyNum]] += self.movementMath[keyNum]
-        elif self.notMove and self.nudge is not None and (self.testTime is None or datetime.now() - self.testTime >= timedelta(seconds=0.1)):
+        elif self.notMove and self.nudge is not None and (self.testTime is None or datetime.now() - self.testTime >= timedelta(seconds=self.testTimeBack)):
+            if self.testTimeBack > 0.1:
+                self.testTimeBack -= 0.1
             self.bonus_draw_time = False
             self.testTime = datetime.now()
             if keyname == self.editor.movements[4]:
@@ -479,6 +525,9 @@ class RootWidget(Widget):
     def changeCameraKeys(self, keyNum):
         if self.editor.level is not None and not self.notMove:
             self.editor.cameraPanKeys[self.cameraNum[keyNum]] = self.cameraMath[keyNum]
+
+    def RemoveEditFiles(self):
+        self.filesToChange = []
 
     def call_idle_handlers(self, event):
         def call(ref):
@@ -521,8 +570,8 @@ class RootWidget(Widget):
 
             self.currentTooltip = None
 
-        def TextTooltip(text):
-            tooltipBacking = Panel()
+        def TextTooltip(text, name):
+            tooltipBacking = Panel(name=name)
             tooltipBacking.bg_color = (0.0, 0.0, 0.0, 0.8)
             tooltipBacking.add(self.labelClass(text))
             tooltipBacking.shrink_wrap()
@@ -547,7 +596,7 @@ class RootWidget(Widget):
         else:
             ttext = widget.tooltipText
             if ttext is not None:
-                tip = TextTooltip(ttext)
+                tip = TextTooltip(ttext, 'Panel.%s'%(repr(widget)))
                 showTip(tip)
 
     def update_tooltip(self, pos=None):

@@ -25,7 +25,7 @@ Exception catching, some basic box drawing, texture pack loading, oddball UI ele
 #!# This stuff will then be available for components base classes in this GUI module.
 #!# And make albow/widgets more coherent to use.
 #!#
-import resource_packs
+from resource_packs import ResourcePackHandler
 from albow.controls import ValueDisplay
 from albow import alert, ask, Button, Column, Label, root, Row, ValueButton, Widget
 from albow.translate import _
@@ -57,7 +57,7 @@ def alertException(func):
         except root.Cancel:
             alert("Canceled.")
         except pymclevel.infiniteworld.SessionLockLost as e:
-            alert(e.message + _("\n\nYour changes cannot be saved."))
+            alert(_(e.message) + _("\n\nYour changes cannot be saved."))
         except Exception, e:
             logging.exception("Exception:")
             ask(_("Error during {0}: {1!r}").format(func, e)[:1000], ["OK"], cancel=0)
@@ -272,7 +272,7 @@ def drawTerrainCuttingWire(box,
 def loadAlphaTerrainTexture():
     pngFile = None
 
-    texW, texH, terraindata = loadPNGFile(os.path.join(directories.getDataDir(), resource_packs.packs.get_selected_resource_pack().terrain_path()))
+    texW, texH, terraindata = loadPNGFile(os.path.join(directories.getDataDir(),  ResourcePackHandler.Instance().get_selected_resource_pack().terrain_path()))
 
     def _loadFunc():
         loadTextureFunc(texW, texH, terraindata)
@@ -548,63 +548,6 @@ def setWindowCaption(prefix):
             display.set_caption(caption)
 
     return ctx()
-
-
-def compareMD5Hashes(found_filters):
-    '''
-    Compares the MD5 Hashes of filters
-    :param found_filters: A list of filter paths
-    '''
-    ff = {}
-    for filter in found_filters:
-        ff[os.path.split(filter)[-1]] = filter
-    try:
-        if not os.path.exists(os.path.join(directories.getDataDir(), "filters.json")):
-            filterDict = {"filter-md5s": {}}
-            with open(os.path.join(directories.getDataDir(), "filters.json"), 'w') as j:
-                json.dump(filterDict, j)
-        else:
-            convert = json.load(open(os.path.join(directories.getDataDir(), "filters.json"), 'rb'))
-            if "filters" in convert:
-                convert["filter-md5s"] = convert["filters"]
-                del convert["filters"]
-                with open(os.path.join(directories.getDataDir(), "filters.json"), 'w') as done:
-                    json.dump(convert, done)
-        filterInBundledFolder = directories.getAllOfAFile(os.path.join(directories.getDataDir(), "stock-filters"), ".py")
-        filterBundle = {}
-        for bundled in filterInBundledFolder:
-            filterBundle[os.path.split(bundled)[-1]] = bundled
-        hashJSON = json.load(open(os.path.join(directories.getDataDir(), "filters.json"), 'rb'))
-        for filt in ff.keys():
-            realName = filt
-            if realName in filterBundle.keys():
-                with open(ff[filt], 'r') as filtr:
-                    filterData = filtr.read()
-                    if realName in hashJSON["filter-md5s"]:
-                        old_hash = hashJSON["filter-md5s"][realName]
-                        bundledData = None
-                        with open(filterBundle[realName]) as bundledFilter:
-                            bundledData = bundledFilter.read()
-                        if old_hash != hashlib.md5(bundledData).hexdigest() and bundledData is not None:
-                            shutil.copy(filterBundle[realName], directories.filtersDir)
-                            hashJSON["filter-md5s"][realName] = hashlib.md5(bundledData).hexdigest()
-                        if old_hash != hashlib.md5(filterData).hexdigest() and hashlib.md5(filterData).hexdigest() != hashlib.md5(bundledData).hexdigest():
-                            shutil.copy(filterBundle[realName], directories.filtersDir)
-                            hashJSON["filter-md5s"][realName] = hashlib.md5(bundledData).hexdigest()
-                    else:
-                        hashJSON["filter-md5s"][realName] = hashlib.md5(filterData).hexdigest()
-        for bundled in filterBundle.keys():
-            if bundled not in ff.keys():
-                shutil.copy(filterBundle[bundled], directories.filtersDir)
-                data = None
-                with open(filterBundle[bundled], 'r') as f:
-                    data = f.read()
-                if data is not None:
-                    hashJSON["filter-md5s"][bundled] = hashlib.md5(data).hexdigest()
-        with open(os.path.join(directories.getDataDir(), "filters.json"), 'w') as done:
-            json.dump(hashJSON, done)
-    except Exception, e:
-        print ('Error: {}'.format(e))
 
 
 def showProgress(progressText, progressIterator, cancel=False):

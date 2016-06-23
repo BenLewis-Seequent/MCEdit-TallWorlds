@@ -45,8 +45,13 @@ class BlockView(GLOrtho):
                                                      - 1, 1,
                                                      1, 1,
                                                      1, -1, ], dtype='float32'))
-        texOrigin = array(self.materials.blockTextures[blockInfo.ID, blockInfo.blockData, 0])
-        texOrigin *= pixelScale
+        # hack to get end rod to render properly
+        # we really should use json models?
+        if blockInfo.ID == 198:
+            texOrigin = array([17*16, 20*16])
+        else:
+            texOrigin = array(self.materials.blockTextures[blockInfo.ID, blockInfo.blockData, 0])
+        texOrigin = texOrigin.astype(float) * pixelScale
 
         GL.glTexCoordPointer(2, GL.GL_FLOAT, 0, array([texOrigin[0], texOrigin[1] + texSize,
                                                        texOrigin[0], texOrigin[1],
@@ -73,6 +78,8 @@ class BlockButton(ButtonBase, Panel):
 
     def __init__(self, materials, blockInfo=None, ref=None, recentBlocks=None, *a, **kw):
         self.allowWildcards = False
+        if 'name' not in kw.keys():
+            kw['name'] = 'Panel.BlockButton'
         Panel.__init__(self, *a, **kw)
 
         self.bg_color = (1, 1, 1, 0.25)

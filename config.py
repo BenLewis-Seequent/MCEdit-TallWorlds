@@ -32,10 +32,18 @@ log = logging.getLogger(__name__)
 
 
 class Config(object):
-    def __init__(self, definitions):
-        self.load()
+    def __init__(self, config_definitions):
+        log.info("Loading config...")
+        self.config = ConfigParser.RawConfigParser([], ConfigDict)
+        self.config.observers = {}
+        try:
+            self.config.read(self.getPath())
+        except Exception, e:
+            log.warn("Error while reading configuration file mcedit.ini: {0}".format(e))
+
+        self.transformConfig()
         self._sections = {}
-        for (sectionKey, sectionName), items in definitions.iteritems():
+        for (sectionKey, sectionName), items in config_definitions.iteritems():
             self._sections[sectionKey] = ConfigSection(self.config, sectionName, items)
             setattr(self, sectionKey, self._sections[sectionKey])
         self.save()
@@ -48,14 +56,14 @@ class Config(object):
         return directories.configFilePath
 
     @staticmethod
-    def transformKey(value, i=0):
+    def transformKey(value, n=0):
         if 'left' in value and len(value) > 5:
             value = value[5:]
         elif 'right' in value and len(value) > 6:
             value = value[6:]
         if 'a' <= value <= 'z':
             value = value.replace(value[0], value[0].upper(), 1)
-        if i >= 36 and "Ctrl-" not in value:
+        if n >= 36 and "Ctrl-" not in value:
             value = "Ctrl-" + value
         if value == "Mouse3":
             value = "Button 3"
@@ -86,17 +94,17 @@ class Config(object):
             return
 
         if version == "1.1.1.1":
-            i = 1
+            n = 1
             for (name, value) in self.config.items("Keys"):
                 if name != "Swap View" and name != "Toggle Fps Counter":
-                    self.config.set("Keys", name, self.transformKey(value, i))
+                    self.config.set("Keys", name, self.transformKey(value, n))
                 elif name == "Swap View":
-                    self.config.set("Keys", "View Distance", self.transformKey(value, i))
+                    self.config.set("Keys", "View Distance", self.transformKey(value, n))
                     self.config.set("Keys", "Swap View", "None")
                 elif name == "Toggle Fps Counter":
-                    self.config.set("Keys", "Debug Overlay", self.transformKey(value, i))
+                    self.config.set("Keys", "Debug Overlay", self.transformKey(value, n))
                     self.config.set("Keys", "Toggle Fps Counter", "None")
-                i += 1
+                n += 1
             if self.config.get("Keys", "Brake") == "Space":
                 version = "1.1.2.0-update"
             else:
@@ -104,27 +112,13 @@ class Config(object):
             self.config.set("Version", "version", version)
             self.save()
 
-    def load(self):
-        log.info("Loading config...")
-        self.config = ConfigParser.RawConfigParser([], ConfigDict)
-        self.config.observers = {}
-        try:
-            self.config.read(self.getPath())
-        except Exception, e:
-            log.warn("Error while reading configuration file mcedit.ini: {0}".format(e))
-
-        self.transformConfig()
-
     def save(self):
         try:
             cf = file(self.getPath(), 'w')
             self.config.write(cf)
             cf.close()
-        except Exception, e:
-                try:
-                    log.error("Error saving configuration settings to mcedit.ini: {0}".format(e))
-                except:
-                    pass
+        except Exception as e:
+            log.error("Error saving configuration settings to mcedit.ini: {0}".format(e))
 
 
 class ConfigSection(object):
@@ -136,7 +130,7 @@ class ConfigSection(object):
         for item in items:
             if isinstance(item, ConfigValue):
                 value = item
-            elif type(item[2]) in [list, tuple]:
+            elif type(item[2]) in ListValue.allowedTypes:
                 value = ListValue(item[0], item[1], item[2])
             else:
                 value = ConfigValue(item[0], item[1], item[2])
@@ -144,6 +138,8 @@ class ConfigSection(object):
             value.section = section
             self._items[value.key] = value
             value.get()
+            if value.section == "Keys" and value.config.get(value.section, value.name) == "Delete":
+                value.config.set(value.section, value.name, "Del")
 
     def __getitem__(self, key):
         return self._items[key]
@@ -381,6 +377,7 @@ definitions = {
         ("up", "up", "Space"),
         ("down", "down", "Shift"),
         ("brake", "brake", "C"),
+        ("sprint", "sprint", "None"),
 
         ("rotateClone", "rotate (clone)", "E"),
         ("rollClone", "roll (clone)", "R"),
@@ -410,7 +407,7 @@ definitions = {
 
         ("openLevel", "open level", "O"),
         ("newLevel", "new level", "N"),
-        ("deleteBlocks", "delete blocks", "Delete"),
+        ("deleteBlocks", "delete blocks", "Del"),
         ("lineTool", "line tool", "Z"),
 
         ("longDistanceMode", "long-distance mode", "Alt-Z"),
@@ -424,7 +421,7 @@ definitions = {
         ("brushLineTool", "brush line tool", "Z"),
         ("snapCloneToAxis", "snap clone to axis", "Ctrl"),
         ("blocksOnlyModifier", "blocks-only modifier", "Alt"),
-        ("fastIncrementModifier", "fast increment modifier", "Ctrl"),
+        ("fastIncrementModifierHold", "fast increment modifier", "Ctrl"),
         ("fastNudge", "fast nudge", "None"),
 
         ("takeAScreenshot", "take a screenshot", "F6"),
@@ -480,11 +477,14 @@ definitions = {
         ("staticCommandsNudge", "Static Coords While Nudging", False),
         ("moveSpawnerPosNudge", "Change Spawners While Nudging", False),
         ("rotateBlockBrush", "rotateBlockBrushRow", True),
-        ("langCode", "Language String", "English (US)"),
+        ("langCode", "Language String", "en_US"),
         ("viewDistance", "View Distance", 8),
         ("targetFPS", "Target FPS", 30),
         ("windowWidth", "window width", 1152),
         ("windowHeight", "window height", 864),
+        ("windowMaximized", "window maximized", False),
+        ("windowMaximizedHeight", "window maximized height", 0),
+        ("windowMaximizedWidth", "window maximized width", 0),
         ("windowX", "window x", 0),
         ("windowY", "window y", 0),
         ("windowShowCmd", "window showcmd", 1),
@@ -521,7 +521,10 @@ definitions = {
         ("fontProportion", "Fonts Proportion", 100),
         ("downloadPlayerSkins", "Download Player Skins", True),
         ("maxViewDistance", "Max View Distance", 32),
-        ("drawPlayerHeads", "Draw Player Heads", True)
+        ("drawPlayerHeads", "Draw Player Heads", True),
+        ("showCommands", "Show Commands when hovering", True),
+        ("savePositionOnClose", "Save camera position on close", False),
+        ("showWindowSizeWarning", "Show window size warning", True)
     ],
     ("controls", "Controls"): [
         ("mouseSpeed", "mouse speed", 5.0),
@@ -588,12 +591,21 @@ definitions = {
         ("useBulletStyles", "Use Bullet Styles", True),
         ("useBulletText", "Use Bullet Text", False),
         ("useBulletImages", "Use Bullet Images", True),
+        ("defaultBulletImages", "Default Bullet Images", True),
         ("bulletFileName", "Bullet Images File", directories.os.path.join(directories.getDataDir(), 'Nbtsheet.png')),
         ("showAllTags", "Show all the tags in the tree", False),
     ],
     ("Filter Keys", "Filter Keys"): [],
     ("session", "Session",): [
         ("override", "Override", False)
+    ],
+    ("commands", "Commands"): [
+        ("sorting", "Sorting", "chain"),
+        ("space", "Space", True),
+        ("fileFormat", "File Format", "txt")
+    ],
+    ("schematicCopying", "Schematics Copying"): [
+        ("cancelCommandBlockOffset", "Cancel Command Block Offset", False)
     ]
 }
 

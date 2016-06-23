@@ -1,3 +1,4 @@
+# -*- coding: utf_8 -*-
 #.# Marks the layout modifications. -- D.C.-G.
 from config import config
 import albow
@@ -27,6 +28,7 @@ class KeyConfigPanel(Dialog):
         "Up",
         "Down",
         "Brake",
+        "Sprint",
         "",
         "<Camera>",
         "Pan Up",
@@ -96,7 +98,7 @@ class KeyConfigPanel(Dialog):
         "Take a Screenshot",
         "Debug Overlay",
         "Fast Nudge",
-        "Fast Increment Modifier",
+        "Fast Increment Modifier (Hold)",
         "",
         "<Toolbar>",
         "Select",
@@ -142,6 +144,7 @@ class KeyConfigPanel(Dialog):
                     ("Up", "Space"),
                     ("Down", "Shift"),
                     ("Brake", "C"),
+                    ("Sprint", "None"),
 
                     ("Pan Up", "I"),
                     ("Pan Down", "K"),
@@ -202,7 +205,7 @@ class KeyConfigPanel(Dialog):
                     ("Take a Screenshot", "F6"),
                     ("Debug Overlay", "0"),
                     ("Fast Nudge", "None"),
-                    ("Fast Increment Modifier", "Ctrl"),
+                    ("Fast Increment Modifier (Hold)", "Ctrl"),
 
                     ("Select", "1"),
                     ("Brush", "2"),
@@ -223,6 +226,7 @@ class KeyConfigPanel(Dialog):
                     ("Up", "Space"),
                     ("Down", "Shift"),
                     ("Brake", "C"),
+                    ("Sprint", "None"),
 
                     ("Pan Up", "I"),
                     ("Pan Down", "K"),
@@ -283,7 +287,7 @@ class KeyConfigPanel(Dialog):
                     ("Take a Screenshot", "F6"),
                     ("Debug Overlay", "0"),
                     ("Fast Nudge", "None"),
-                    ("Fast Increment Modifier", "Ctrl"),
+                    ("Fast Increment Modifier (Hold)", "Ctrl"),
 
                     ("Select", "1"),
                     ("Brush", "2"),
@@ -304,6 +308,7 @@ class KeyConfigPanel(Dialog):
                     ("Up", "Page Up"),
                     ("Down", "Page Down"),
                     ("Brake", "Space"),
+                    ("Sprint", "None"),
 
                     ("Pan Up", "I"),
                     ("Pan Down", "K"),
@@ -364,7 +369,7 @@ class KeyConfigPanel(Dialog):
                     ("Take a Screenshot", "F6"),
                     ("Debug Overlay", "0"),
                     ("Fast Nudge", "None"),
-                    ("Fast Increment Modifier", "Ctrl"),
+                    ("Fast Increment Modifier (Hold)", "Ctrl"),
 
                     ("Select", "1"),
                     ("Brush", "2"),
@@ -385,6 +390,7 @@ class KeyConfigPanel(Dialog):
                     ("Up", "[7]"),
                     ("Down", "[1]"),
                     ("Brake", "[0]"),
+                    ("Sprint", "None"),
 
                     ("Pan Up", "I"),
                     ("Pan Down", "K"),
@@ -445,7 +451,7 @@ class KeyConfigPanel(Dialog):
                     ("Take a Screenshot", "F6"),
                     ("Debug Overlay", "0"),
                     ("Fast Nudge", "None"),
-                    ("Fast Increment Modifier", "Ctrl"),
+                    ("Fast Increment Modifier (Hold)", "Ctrl"),
 
                     ("Select", "1"),
                     ("Brush", "2"),
@@ -466,6 +472,7 @@ class KeyConfigPanel(Dialog):
                     ("Up", "Q"),
                     ("Down", "Z"),
                     ("Brake", "Space"),
+                    ("Sprint", "None"),
 
                     ("Pan Up", "I"),
                     ("Pan Down", "K"),
@@ -526,7 +533,7 @@ class KeyConfigPanel(Dialog):
                     ("Take a Screenshot", "F6"),
                     ("Debug Overlay", "0"),
                     ("Fast Nudge", "Shift"),
-                    ("Fast Increment Modifier", "Shift"),
+                    ("Fast Increment Modifier (Hold)", "Shift"),
 
                     ("Select", "1"),
                     ("Brush", "2"),
@@ -575,6 +582,7 @@ class KeyConfigPanel(Dialog):
         #.#
         spacing = 0
         tb = albow.TableView()
+        self.nrows = 581 / tb.font.get_linesize()
         keyConfigTable = albow.TableView(nrows=581 / tb.font.get_linesize(),
             columns=[albow.TableColumn("Command", 200, "l"), albow.TableColumn("Assigned Key", 150, "r")])
         del tb
@@ -633,6 +641,8 @@ class KeyConfigPanel(Dialog):
             config.keys.panDown.get()
         ]
 
+        self.editor.sprintKey = config.keys.sprint.get()
+
         self.root.movementLabel.text = _("{0}/{1}/{2}/{3}/{4}/{5} to move").format(
             _(config.keys.forward.get()),
             _(config.keys.left.get()),
@@ -669,7 +679,11 @@ class KeyConfigPanel(Dialog):
         if self.isConfigKey(configKey):
             key = config.keys[config.convert(configKey)].get()
             try:
+                oldKey = key
                 key = self.editor.different_keys[key]
+                if key != oldKey:
+                    config.keys[config.convert(configKey)].set(key)
+                    config.save()
             except:
                 pass
 
@@ -727,6 +741,12 @@ class KeyConfigPanel(Dialog):
         elif keyname == 'Return':
             self.enter += 1
             self.askAssignSelectedKey()
+        elif keyname == 'Page down':
+            self.selectedKeyIndex = min(len(self.keyConfigKeys) - 1, self.selectedKeyIndex + self.nrows)
+        elif keyname == 'Page up':
+            self.selectedKeyIndex = max(0, self.selectedKeyIndex - self.nrows)
+        if self.keyConfigTable.rows.cell_to_item_no(0, 0) + self.keyConfigTable.rows.num_rows() -1 > self.selectedKeyIndex or self.keyConfigTable.rows.cell_to_item_no(0, 0) + self.keyConfigTable.rows.num_rows() -1 < self.selectedKeyIndex:
+            self.keyConfigTable.rows.scroll_to_item(self.selectedKeyIndex)
 
     def key_up(self, evt):
         pass
@@ -739,8 +759,8 @@ class KeyConfigPanel(Dialog):
             self.enter = 0
             return
 
-        panel = Panel()
-        panel.bg_color = (0.5, 0.5, 0.6, 1.0)
+        panel = Panel(name='Panel.KeyConfigPanel')
+        panel.bg_color = (0.3, 0.3, 0.3, 1.0)
 
         if labelString is None and configKey != "Fast Nudge":
             labelString = _("Press a key to assign to the action \"{0}\"\n\nPress ESC to cancel.").format(_(configKey))
@@ -803,9 +823,9 @@ class KeyConfigPanel(Dialog):
                 return True
             oldkey = config.keys[config.convert(configKey)].get()
             config.keys[config.convert(configKey)].set(keyname)
-            if configKey not in self.changes:
+            if oldkey != keyname and configKey not in self.changes:
                 self.changes[configKey] = oldkey
-            self.changesNum = True
+                self.changesNum = True
         elif keyname != "Escape":
             self.askAssignKey(configKey,
                                     _("You can't use the key {0}. Press a new key.\n\nPress ESC to cancel.")

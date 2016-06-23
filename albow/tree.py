@@ -154,6 +154,9 @@ class Tree(Column):
             global map_types_item
             self.map_types_item = setup_map_types_item()
         self.selected_item_index = None
+        # cached_item_index is set to False during startup to avoid a predefined selected item to be unselected when closed
+        # the first time.
+        self.cached_selected_item_index = False
         self.selected_item = None
         self.clicked_item = None
         self.copyBuffer = kwargs.pop('copyBuffer', None)
@@ -176,6 +179,42 @@ class Tree(Column):
         row_height = self.font.get_linesize()
         self.treeRow = treeRow = TreeRow((self.inner_width, row_height), 10, draw_zebra=draw_zebra)
         Column.__init__(self, [treeRow,], **kwargs)
+
+    def dispatch_key(self, name, evt):
+        if not hasattr(evt, 'key'):
+            return
+        if name == "key_down":
+            keyname = self.root.getKey(evt)
+            if keyname == "Up" and self.selected_item_index > 0:
+                if self.selected_item_index is None:
+                    self.selected_item_index = -1
+                self.selected_item_index = max(self.selected_item_index - 1, 0)
+                keyname = 'Return'
+            elif keyname == "Down" and self.selected_item_index < len(self.rows) - 1:
+                if self.selected_item_index is None:
+                    self.selected_item_index = -1
+                self.selected_item_index += 1
+                keyname = 'Return'
+            elif keyname == 'Page down':
+                if self.selected_item_index is None:
+                    self.selected_item_index = -1
+                self.selected_item_index = min(len(self.rows) - 1, self.selected_item_index + self.treeRow.num_rows())
+                keyname = 'Return'
+            elif keyname == 'Page up':
+                if self.selected_item_index is None:
+                    self.selected_item_index = -1
+                self.selected_item_index = max(0, self.selected_item_index - self.treeRow.num_rows())
+                keyname = 'Return'
+
+            if self.treeRow.cell_to_item_no(0, 0) is not None and (self.treeRow.cell_to_item_no(0, 0) + self.treeRow.num_rows() -1 > self.selected_item_index or self.treeRow.cell_to_item_no(0, 0) + self.treeRow.num_rows() -1 < self.selected_item_index):
+                self.treeRow.scroll_to_item(self.selected_item_index)
+
+            if keyname == 'Return' and self.selected_item_index != None:
+                self.select_item(self.selected_item_index)
+                if self.selected_item[7] in self.compound_types:
+                    self.deploy(self.selected_item[6])
+                if self.selected_item is not None and hasattr(self, "update_side_panel"):
+                    self.update_side_panel(self.selected_item)
 
     def cut_item(self):
         self.copyBuffer = ([] + self.selected_item, 1)
@@ -357,10 +396,17 @@ class Tree(Column):
         aId = len(items) + 1
         while items:
             lvl, k, v, p, c, id = items.pop(0)
-            
+            t = None
             _c = False
             fields = []
             c = [] + c
+            # If the 'v' object is a dict containing the keys 'value' and 'tooltipText',
+            # extract the text, and override the 'v' object with the 'value' value.
+            if type(v) == dict and len(v.keys()) and ('value' in v.keys() and 'tooltipText' in v.keys()):
+                t = v['tooltipText']
+                if type(t) not in (str, unicode):
+                    t = repr(t)
+                v = v['value']
             if type(v) in self.compound_types:
                 meth = getattr(self, 'parse_%s'%v.__class__.__name__, None)
                 if meth is not None:
@@ -398,16 +444,34 @@ class Tree(Column):
                 meth(head, bg, fg, shape, text, k, lvl)
             except:
                 pass
-            rows.append([head, fields, [w] * len(fields), k, p, c, id, type(v), lvl, v])
+            rows.append([head, fields, [w] * len(fields), k, p, c, id, type(v), lvl, v, t])
         self.rows = rows
         return rows
 
-    def deploy(self, id):
-            if id in self.deployed:
+    def deploy(self, n):
+        id = self.rows[n][6]
+        if id in self.deployed:
+            while id in self.deployed:
                 self.deployed.remove(id)
+        else:
+            self.deployed.append(id)
+        self.build_layout()
+        l = (self.selected_item[3], self.selected_item[4])
+        if type(self.cached_selected_item_index) != bool:
+            if self.cached_selected_item_index and self.cached_selected_item_index < self.num_rows():
+                r = self.rows[self.cached_selected_item_index]
+                r = (r[3], r[4])
             else:
-                self.deployed.append(id)
-            self.build_layout()
+                r = (-1, -1)
+        else:
+            r = l
+            self.cached_selected_item_index = self.selected_item_index
+
+        if l == r:
+            self.selected_item_index = self.cached_selected_item_index
+        else:
+            self.cached_selected_item_index = self.selected_item_index
+            self.selected_item_index = None
 
     def click_item(self, n, pos):
         """..."""
@@ -415,8 +479,7 @@ class Tree(Column):
         r = self.get_bullet_rect(row[0], row[8])
         x = pos[0]
         if self.margin + r.left - self.treeRow.hscroll <= x <= self.margin + self.treeRow.margin + r.right - self.treeRow.hscroll:
-            id = row[6]
-            self.deploy(id)
+            self.deploy(n)
         else:
             self.select_item(n)
 

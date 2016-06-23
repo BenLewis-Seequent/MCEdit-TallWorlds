@@ -1,7 +1,6 @@
 # -*- coding: UTF-8 -*-
 # extended_widgets.py
 # Moved albow related stuff from mceutils.
-import resource_packs
 from controls import ValueDisplay
 from dialogs import alert, ask, Dialog
 from controls import Button, Label, ValueButton, CheckBox, AttrRef
@@ -10,7 +9,7 @@ import root
 from layout import Column, Row
 from translate import _
 from menu import Menu
-from fields import FloatField, IntField, TextFieldWrapped
+from fields import FloatField, IntField, TextFieldWrapped, TextField
 from datetime import timedelta, datetime
 
 
@@ -18,15 +17,25 @@ class HotkeyColumn(Widget):
     is_gl_container = True
 
 #-# Translation live update preparation
-    def __init__(self, items, keysColumn=None, buttonsColumn=None, item_spacing=None):
+    def __init__(self, items, keysColumn=None, buttonsColumn=None, item_spacing=None, translateButtons=True):
+        """:items iterable containing iterables composed with the hotkey, the label of the button and the binding
+        :keysColumn iterable
+        :buttonsColumn iterable containing Button widgets
+        :item_spacing int
+        :translateButtons bool or iterable of int
+            If bool, all the buttons in :items will be translated (True) or not (False).
+            If iterable, the elements must be (signed) ints corresponding to the indexes of the buttons to be translated in :items.
+            The buttons not referenced in an iterable :translateButtons will not be translated.
+        """
         self.items = items
         self.item_spacing = item_spacing
         self.keysColumn = keysColumn
         self.buttonsColumn = buttonsColumn
+        self.translateButtons = translateButtons
         Widget.__init__(self)
         self.buildWidgets()
 
-    def set_update_translation(self, v):
+    def set_update_ui(self, v):
         if v:
             self.buildWidgets()
 
@@ -47,16 +56,20 @@ class HotkeyColumn(Widget):
                 w.remove(_w)
             self.remove(w)
 
-        for t in items:
+        for i, t in enumerate(items):
+            if type(self.translateButtons) is bool:
+                trn = not self.translateButtons
+            elif type(self.translateButtons) in (list, tuple):
+                trn = not i in self.translateButtons
             if len(t) == 3:
                 (hotkey, title, action) = t
                 tooltipText = None
             else:
                 (hotkey, title, action, tooltipText) = t
             if isinstance(title, (str, unicode)):
-                button = Button(title, action=action)
+                button = Button(title, action=action, doNotTranslate=trn)
             else:
-                button = ValueButton(ref=title, action=action, width=200)
+                button = ValueButton(ref=title, action=action, width=200, doNotTranslate=trn)
             button.anchor = self.anchor
 
             label = Label(hotkey, width=100, margin=button.margin)
@@ -99,7 +112,8 @@ class MenuButton(Button):
     def __init__(self, title, choices, **kw):
         Button.__init__(self, title, **kw)
         self.choices = choices
-        self.menu = Menu(title, ((c, c) for c in choices))
+#         self.menu = Menu(title, ((c, c) for c in choices))
+        self.menu = Menu(title, ((c, None) for c in choices))
 
     def action(self):
         index = self.menu.present(self, (0, 0))
@@ -121,6 +135,7 @@ class ChoiceButton(ValueButton):
         if 'choose' in kw:
             self.choose = kw.pop('choose')
 
+        self.doNotTranslate = kw.get('doNotTranslate', False)
 
         #-# Translation live update preparation
         self.scrolling = scrolling
@@ -134,12 +149,12 @@ class ChoiceButton(ValueButton):
         self.choiceIndex = 0
 
     #-# Translation live update preparation
-    def set_update_translation(self, v):
-        ValueButton.set_update_translation(self, v)
-        self.menu.set_update_translation(v)
+    def set_update_ui(self, v):
+        ValueButton.set_update_ui(self, v)
+        self.menu.set_update_ui(v)
 
     def calc_width(self):
-        widths = [self.font.size(_(c))[0] for c in self.choices] + [self.width]
+        widths = [self.font.size(_(c, self.doNotTranslate))[0] for c in self.choices] + [self.width]
         if len(widths):
             self.width = max(widths) + self.margin * 2
 
@@ -178,11 +193,22 @@ class ChoiceButton(ValueButton):
     def choices(self, ch):
         self._choices = ch
         self.menu = Menu("", [(name, "pickMenu") for name in self._choices],
-                         self.scrolling, self.scroll_items)
+                         self.scrolling, self.scroll_items, doNotTranslate=self.doNotTranslate)
 
 
 def CheckBoxLabel(title, *args, **kw):
     tooltipText = kw.pop('tooltipText', None)
+
+    l_kw = {'margin': 0}
+    b_kw = {'margin': 0}
+    expand = kw.pop('expand', 'none')
+    r_kw = {}
+    if expand != 'none':
+        r_kw['expand'] = expand
+
+    align = kw.pop('align', None)
+    if align:
+        r_kw['align'] = align
 
     cb = CheckBox(*args, **kw)
     lab = Label(title, fg_color=cb.fg_color)
@@ -203,7 +229,7 @@ def CheckBoxLabel(title, *args, **kw):
         def value(self, val):
             self.checkbox.value = val
 
-    row = CBRow((lab, cb))
+    row = CBRow((Column((lab,), **l_kw), Column((cb,), **b_kw)), **r_kw)
     row.checkbox = cb
     return row
 
@@ -218,6 +244,10 @@ def IntInputRow(title, *args, **kw):
 
 def TextInputRow(title, *args, **kw):
     return Row((Label(title, tooltipText=kw.get('tooltipText')), TextFieldWrapped(*args, **kw)))
+
+  
+def BasicTextInputRow(title, *args, **kw):
+    return Row((Label(title, tooltipText=kw.get('tooltipText')), TextField(*args, **kw)))
 
 
 def showProgress(progressText, progressIterator, cancel=False):

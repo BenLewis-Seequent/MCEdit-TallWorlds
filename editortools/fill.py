@@ -69,7 +69,7 @@ class BlockFillOperation(Operation):
 
 class FillToolPanel(Panel):
     def __init__(self, tool):
-        Panel.__init__(self)
+        Panel.__init__(self, name='Panel.FillToolPanel')
         self.tool = tool
         replacing = tool.replacing
 
@@ -96,7 +96,6 @@ class FillToolPanel(Panel):
                # swapRow,
                replaceLabel,
                # self.replaceBlockButton,
-               self.noDataCheckBox,
                self.fillButton)
 
         if replacing:
@@ -106,7 +105,8 @@ class FillToolPanel(Panel):
             self.replaceBlockButton.blockInfo = tool.replaceBlockInfo
             self.replaceBlockButton.action = self.pickReplaceBlock
             self.replaceLabel.text = "Replace with:"
-            
+            self.replaceLabel.tooltipText = _("Shortcut: {0}").format(_("Esc"))
+
             self.swapButton = Button("Swap", action=self.swapBlockTypes, width=self.blockButton.width)
             self.swapButton.fg_color = (255, 255, 255, 255)
             self.swapButton.highlight_color = (60, 255, 60, 255)
@@ -151,7 +151,7 @@ class FillToolPanel(Panel):
 
 class FillToolOptions(ToolOptions):
     def __init__(self, tool):
-        Panel.__init__(self)
+        ToolOptions.__init__(self, name='Panel.FillToolOptions')
         self.tool = tool
         self.autoChooseCheckBoxFill = CheckBoxLabel("Open Block Picker for Fill",
                                                 ref=config.fill.chooseBlockImmediately,
@@ -229,8 +229,9 @@ class FillTool(EditorTool):
     chooseBlockImmediatelyReplace = config.fill.chooseBlockImmediatelyReplace.property()
 
     def toolReselected(self):
-        self.showPanel()
-        self.panel.pickFillBlock()
+        if not self.replacing:
+            self.showPanel()
+            self.panel.pickFillBlock()
 
     def cancel(self):
         self.hidePanel()
@@ -310,6 +311,16 @@ class FillTool(EditorTool):
         self.hidePanel()
         self.showPanel()
         if self.replacing and self.chooseBlockImmediatelyReplace:
+            self.panel.pickReplaceBlock()
+
+    def openReplace(self):
+        if not self.replacing:
+            self.replacing = True
+            self.hidePanel()
+            self.showPanel()
+            if self.chooseBlockImmediatelyReplace:
+                self.panel.pickReplaceBlock()
+        else:
             self.panel.pickReplaceBlock()
 
     @alertException

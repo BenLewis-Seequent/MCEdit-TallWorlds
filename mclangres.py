@@ -33,6 +33,7 @@ excludedEntries = ['tile.flower1.name',]
 
 # Used to track untranslated and out dated MCEdit resources.
 # Set it to true to generate/add entries to 'missingmclangres.txt' in MCEdit folder.
+# Note that some strings may be falsely reported. (Especialy a '7 (Source)' one...)
 # ! ! ! Please, pay attention to disable this befor releasing ! ! !
 report_missing = False
 
@@ -69,9 +70,16 @@ def buildResources(version=None, lang=None):
     csimEn = {}
     langMisc = {}
     csimGnal = {}
+    if not os.path.exists(indexesDirectory) or not os.path.exists(objectsDirectory):
+        log.debug('Minecraft installation directory is not valid.')
+        log.debug('Impossible to load the game language resources.')
+        return
     versions = os.listdir(indexesDirectory)
     if 'legacy.json' in versions:
         versions.remove('legacy.json')
+    if len(versions) == 0:
+        log.debug("No valid versions found in minecraft install directory")
+        return
     versions.sort()
     version = "%s.json"%version
     if version in versions:
@@ -195,8 +203,6 @@ if report_missing:
                 n += a
         elems = n.split(' ', 1)
         head = elems[0].lower()
-        if head.isdigit():
-            head = ''
         tail = ''
         if len(elems) > 1:
             tail = ''.join([a.capitalize() for a in elems[1].split(' ') if not a.isdigit()])

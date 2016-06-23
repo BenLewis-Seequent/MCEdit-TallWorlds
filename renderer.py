@@ -34,6 +34,184 @@ MCRenderer:
         (*) BlockRenderer
             Has "vertexArrays"
             One per block type, plus one for low detail and one for Entity
+
+BlockRender documentation
+
+  Each Block renderer renders a particular block types or entities.
+
+  The block renderer that is chosen to draw that block type(by ID)
+  is the block renderer class that is lowest in the list within the
+  makeRenderstates method. Each blockRenderer is assigned a materialIndex
+  and the blockMaterial parameter indicates what material index each block
+  in the chunk is therefore what block renderer is used to render it.
+
+  Vertex arrays are arrays of vertices(groups of six elements) and
+  every group of 4 vertices is a quad that will be drawn.
+
+  Before the vertex arrays will be drawn `.ravel()` will be called
+    (flattened to one dimension arrays).
+
+    The vertex arrays will draw quads and each vertex elements
+    with the foramt:
+      0:3 index - xyz values
+      3:5 index - st(texture coordinates) values
+      5   index - rgba(colour) value
+                  Note: each element of rgba value is a uint8 type(the 4 colour
+                        elements makes up 32 bits) to view/change the values use
+                        `.view('uint8')` to change the view of the array into uint8 type.
+
+  To implement a block renderer either makeVertices or makeFaceVertices
+  needs to be implemented. The base class BlockRenderer implements
+  makeVertices in terms of makeFaceVertices, by iterating over the different
+  face directions.
+
+  The makeVertices function is called on the block renderer to gat a
+  list of vertexArrays that will draw the blocks for a 16x16x16 chunk.
+
+   parameters:
+
+    all parameters are in xzy order
+
+    facingBlockIndices:
+      list of 6, (16, 16, 16) numpy boolean arrays
+
+      each array corresponds to the blocks within the chunk that
+      has it face exposed in that direction. The direction is the
+      index into the list defined by the constants in pymclevel/faces.py
+
+      This is used to only draw exposed faces
+
+    blocks:
+      (16, 16, 16) numpy array of the id of blocks in the chunk
+
+    blockMaterials:
+      (16, 16, 16) numpy array of the material index of each block in the chunk
+
+      each material refers to a different block renderer to get the
+      material index for this block renderer `self.materialIndex`
+
+    blockData:
+      (16, 16, 16) numpy array of the metadata value of each block
+      in the chunk
+
+    areaBlockLights:
+      (18, 18, 18) numpy array of light value(max of block light and
+      skylight) of the chunk and 1 block 'border' aroun it.
+
+    texMap:
+      function that takes id, data value and directions
+      and returns texture coordinates
+
+    returns a list of vertex arrays in the form of float32 numpy arrays.
+    For this chunk.
+
+  The makeFaceVertices gets an vertexArray for a particular face.
+
+   parameters:
+
+    all parameters are in xzy order
+
+    direction:
+      the face defined by constants in pymclevel/faces.py
+
+    materialIndices:
+      list of (x, z, y) indices of blocks in this chunks that
+      is of this material(in blocktypes).
+
+    exposedFaceIndices:
+      list of (x, z, y) indices of blocks that has an exposed face
+      in the direction `direction`.
+
+    blocks:
+      (16, 16, 16) numpy array of the id of blocks in the chunk
+
+    blockData:
+      (16, 16, 16) numpy array of the metadata value of each block
+      in the chunk
+
+    blockLights:
+      (16, 16, 16) numpy array of light values(max of block light and
+      skylight) of the blocks in the chunk chunk.
+
+    facingBlockLight:
+      (16, 16, 16) numpy array of light values(max of block light and
+      skylight) of the blocks just in front of the face.
+
+      i.e.
+        if direction = pymclevel.faces.FaceXDecreasing
+        facingBlockLight[1, 0, 0] refers to the light level
+        at position (0, 0, 0) within the chunk.
+
+    texMap:
+      function that takes id, data value and directions
+      and returns texture coordinates
+
+    returns a list of vertex arrays in the form of float32 numpy arrays.
+
+  Fields
+
+    blocktypes / getBlocktypes(mats)
+      list of block ids the block renderer handles
+
+    detailLevels
+      what detail level the renderer render at
+
+    layer
+      what layer is this block renderer in
+
+    renderstate
+      the render state this block renderer uses
+
+  Models:
+
+    There are also several functions that make it easy to translate
+    json models to block renderer.
+
+    makeVertexTemplatesFromJsonModel:
+      creates a template from information that is in json models
+
+    rotateTemplate:
+      rotate templates. This is equivalent to the rotation in block states files.
+
+    makeVerticesFromModel:
+      creates function based on templates to be used for makeVertices function in block renderer.
+
+  Helper functions:
+
+    self.MaterialIndices(blockMaterial):
+      Given blockMaterial(parameter in makeVertices) it return a list of
+      (x, z, y) indices of blocks in the chunk that are of this block renderer
+      material(blocktypes).
+
+    self.makeTemplate(direction, blockIndices):
+      get a vertex array filled with default values for face `direction`
+      and for the block relating to `blockIndices`
+
+    makeVertexTemplates(xmin=0, ymin=0, zmin=0, xmax=1, ymax=1, zmax=1):
+      returns a numpy array with dimensions (6, 4, 6) filled with values to create
+      a vertex array for a cube.
+
+  For Entities:
+
+    renderer's for entities are similar to blocks but:
+      - they extend EntityRendererGeneric class
+      - they are added to the list in calcFacesForChunkRenderer method
+      - makeChunkVertices(chunk) where chunk is a chunk object
+        is called rather than makeVertices
+
+    there is also a helper method _computeVertices(positions, colors, offset, chunkPosition):
+     parameters:
+      positions
+        locations of entity
+      colors
+        colors of entity boxes
+      offset
+        whether to offset the box
+      chunkPosition
+        chunk position of the chunk
+
+      creates a vertex array that draws entity boxes
+
 """
 
 from collections import defaultdict, deque
@@ -234,6 +412,141 @@ _RGB = numpy.s_[..., 20:23]
 _A = numpy.s_[..., 23]
 
 
+def makeVertexTemplatesFromJsonModel(fromVertices, toVertices, uv):
+    """
+    This is similar to makeVertexTemplates but is a more convenient
+    when reading off of the json model files.
+    :param fromVertices: from
+    :param toVertices:   to
+    :param uv:           keywords uv map
+    :return:             template for a cube
+    """
+    xmin = fromVertices[0] / 16.
+    xmax = toVertices[0] / 16.
+    ymin = fromVertices[1] / 16.
+    ymax = toVertices[1] / 16.
+    zmin = fromVertices[2] / 16.
+    zmax = toVertices[2] / 16.
+    return numpy.array([
+        # FaceXIncreasing:
+        [[xmax, ymin, zmax, uv["east"][0], uv["east"][3], 0x0b],
+         [xmax, ymin, zmin, uv["east"][2], uv["east"][3], 0x0b],
+         [xmax, ymax, zmin, uv["east"][2], uv["east"][1], 0x0b],
+         [xmax, ymax, zmax, uv["east"][0], uv["east"][1], 0x0b],
+        ],
+
+        # FaceXDecreasing:
+        [[xmin, ymin, zmin, uv["west"][0], uv["west"][3], 0x0b],
+         [xmin, ymin, zmax, uv["west"][2], uv["west"][3], 0x0b],
+         [xmin, ymax, zmax, uv["west"][2], uv["west"][1], 0x0b],
+         [xmin, ymax, zmin, uv["west"][0], uv["west"][1], 0x0b]],
+
+
+        # FaceYIncreasing:
+        [[xmin, ymax, zmin, uv["up"][0], uv["up"][1], 0x11],  # ne
+         [xmin, ymax, zmax, uv["up"][0], uv["up"][3], 0x11],  # nw
+         [xmax, ymax, zmax, uv["up"][2], uv["up"][3], 0x11],  # sw
+         [xmax, ymax, zmin, uv["up"][2], uv["up"][1], 0x11]],  # se
+
+        # FaceYDecreasing:
+        [[xmin, ymin, zmin, uv["down"][0], uv["down"][3], 0x08],
+         [xmax, ymin, zmin, uv["down"][2], uv["down"][3], 0x08],
+         [xmax, ymin, zmax, uv["down"][2], uv["down"][1], 0x08],
+         [xmin, ymin, zmax, uv["down"][0], uv["down"][1], 0x08]],
+
+        # FaceZIncreasing:
+        [[xmin, ymin, zmax, uv["south"][0], uv["south"][3], 0x0d],
+         [xmax, ymin, zmax, uv["south"][2], uv["south"][3], 0x0d],
+         [xmax, ymax, zmax, uv["south"][2], uv["south"][1], 0x0d],
+         [xmin, ymax, zmax, uv["south"][0], uv["south"][1], 0x0d]],
+
+        # FaceZDecreasing:
+        [[xmax, ymin, zmin, uv["north"][0], uv["north"][3], 0x0d],
+         [xmin, ymin, zmin, uv["north"][2], uv["north"][3], 0x0d],
+         [xmin, ymax, zmin, uv["north"][2], uv["north"][1], 0x0d],
+         [xmax, ymax, zmin, uv["north"][0], uv["north"][1], 0x0d],
+        ],
+
+    ])
+
+
+def rotateTemplate(template, x=0, y=0):
+    """
+    Rotate template around x-axis and then around
+    y-axis. Both angles must to multiples of 90.
+    TODO: Add ability for multiples of 45
+    """
+    template = template.copy()
+    for _ in range(0, x, 90):
+        # y -> -z and z -> y
+        template[..., (1, 2)] = template[..., (2, 1)]
+        template[..., 2] -= 0.5
+        template[..., 2] *= -1
+        template[..., 2] += 0.5
+
+    for _ in range(0, y, 90):
+        # z -> -x and x -> z
+        template[..., (0, 2)] = template[..., (2, 0)]
+        template[..., 0] -= 0.5
+        template[..., 0] *= -1
+        template[..., 0] += 0.5
+    return template
+
+
+def makeVerticesFromModel(templates, dataMask=0, debug=False, id=""):
+    """
+    Returns a function that creates vertex arrays.
+
+    This produces vertex arrays based on the passed
+    templates. This doesn't cull any faces based on
+    if they are exposed.
+
+    :param templates: list of templates to draw
+    :param dataMask:  mask to mask the data
+    """
+    if type(templates) is list:
+        templates = numpy.array(templates)
+    if templates.shape == (6, 4, 6):
+        templates = numpy.array([templates])
+    if len(templates.shape) == 4:
+        templates = templates[numpy.newaxis, ...]
+    elements = templates.shape[0]
+
+    def makeVertices(self, facingBlockIndices, blocks, blockMaterials, blockData, areaBlockLights, texMap):
+        mask = self.getMaterialIndices(blockMaterials)
+        blockIndices = mask.nonzero()
+        yield
+
+        data = blockData[mask]
+        data &= dataMask
+        self.vertexArrays = []
+        if debug:
+            print "=== " + id + " ==="
+            print "Elements: " + str(elements)
+            print "Data: " + str(data)
+            print "Block Mask: " + str(blockData[mask])
+            print "Supplied Mask: " + str(dataMask)
+        for i in range(elements):
+            vertexArray = numpy.zeros((len(blockIndices[0]), 6, 4, 6), dtype='float32')
+            for indicies in range(3):
+                dimension = (0, 2, 1)[indicies]
+
+                vertexArray[..., indicies] = blockIndices[dimension][:, numpy.newaxis,
+                                             numpy.newaxis]  # xxx swap z with y using ^
+                
+            vertexArray[..., 0:5] += templates[i, data][..., 0:5]
+            vertexArray[_ST] += texMap(blocks[blockIndices], blockData[blockIndices] & 15)[..., numpy.newaxis, :]
+
+            vertexArray.view('uint8')[_RGB] = templates[i, data][..., 5][..., numpy.newaxis]
+            vertexArray.view('uint8')[_A] = 0xFF
+            vertexArray.view('uint8')[_RGB] *= areaBlockLights[1:-1, 1:-1, 1:-1][blockIndices][
+                ..., numpy.newaxis, numpy.newaxis, numpy.newaxis]
+            vertexArray.shape = (vertexArray.shape[0] * 6, 4, 6)
+            yield
+            self.vertexArrays.append(vertexArray)
+    return makeVertices
+
+
 def makeVertexTemplates(xmin=0, ymin=0, zmin=0, xmax=1, ymax=1, zmax=1):
     return numpy.array([
 
@@ -422,19 +735,23 @@ class ChunkCalculator(object):
                 PaneBlockRenderer,
                 CakeBlockRenderer,
                 DaylightBlockRenderer,
+                StandingSignRenderer,
                 WallSignBlockRenderer,
-                #LeverBlockRenderer,
+                LeverBlockRenderer,
                 BedBlockRenderer,
                 EnchantingBlockRenderer,
                 RedstoneBlockRenderer,
                 IceBlockRenderer,
-                #ButtonBlockRenderer,
+                DoorRenderer,
+                ButtonRenderer,
+                TrapDoorRenderer,
                 FenceBlockRenderer,
-                NetherFenceBlockRenderer,
+                FenceGateBlockRenderer,
                 StairBlockRenderer,
                 RepeaterBlockRenderer,
                 VineBlockRenderer,
                 PlateBlockRenderer,
+                EndRodRenderer,
                 # button, floor plate, door -> 1-cube features
                 # lever, sign, wall sign, stairs -> 2-cube features
                 # fence
@@ -483,15 +800,15 @@ class ChunkCalculator(object):
             pymclevel.materials.alphaMaterials.JungleFenceGate,
             pymclevel.materials.alphaMaterials.DarkOakFenceGate,
             pymclevel.materials.alphaMaterials.AcaciaFenceGate,
-            pymclevel.materials.alphaMaterials.Sign
-
+            pymclevel.materials.alphaMaterials.Sign,
+            pymclevel.materials.alphaMaterials.StructureVoid
         ]
         for b in transparentMaterials:
             mats[b.ID] = materialCount
             materialCount += 1
 
     # don't show boundaries between dirt,grass,sand,gravel,or stone.
-    hiddenOreMaterials = numpy.arange(pymclevel.materials.id_limit, dtype='uint8')
+    hiddenOreMaterials = numpy.arange(pymclevel.materials.id_limit, dtype='uint16')
     stoneid = pymclevel.materials.alphaMaterials.Stone.ID
     hiddenOreMaterials[pymclevel.materials.alphaMaterials.Dirt.ID] = stoneid
     hiddenOreMaterials[pymclevel.materials.alphaMaterials.Grass.ID] = stoneid
@@ -739,6 +1056,28 @@ class ChunkCalculator(object):
         blockMaterials = areaBlockMats[1:-1, 1:-1, 1:-1]
         if self.roughGraphics:
             blockMaterials.clip(0, 1, blockMaterials)
+        else:
+            # Special case for doors
+            #
+            # Each part of a door itself does not have all of the information required
+            # to render, as direction/whether its open is on the lower part and the hinge
+            # side is on the upper part. So here we combine the metadata of the bottom part
+            # with the top to form 0-32 metadata(which would be used in door renderer).
+            #
+            copied = False
+            for door in DoorRenderer.blocktypes:
+                doors = blocks == door
+                if doors.any():
+                    if not copied:
+                        # copy if required but only once
+                        blockData = blockData.copy()
+                        copied = True
+                    # only accept lower part one block below upper part
+                    valid = doors[:, :, :-1] & doors[:, :, 1:] & (blockData[:, :, :-1] < 8) & (blockData[:, :, 1:] >= 8)
+                    mask = valid.nonzero()
+                    upper_mask = (mask[0], mask[1], mask[2]+1)
+                    blockData[mask] += (blockData[upper_mask] - 8) * 16
+                    blockData[upper_mask] = blockData[mask] + 8
 
         # this seems like it will only work for 16 * 16 * 16 chunks
         sx = sy = sz = slice(0, 16)
@@ -1226,7 +1565,7 @@ class LowDetailBlockRenderer(BlockRenderer):
 
             if self.detailLevel == 2:
                 heightfactor = (y / float(2.0 * ch.world.Height)) + 0.5
-                flatcolors[..., :3] *= heightfactor[:, numpy.newaxis, numpy.newaxis]
+                flatcolors[..., :3] = flatcolors[..., :3].astype(float) * heightfactor[:, numpy.newaxis, numpy.newaxis]
 
             _RGBA = numpy.s_[..., 12:16]
             va0.view('uint8')[_RGBA] = flatcolors
@@ -1249,7 +1588,7 @@ class LowDetailBlockRenderer(BlockRenderer):
             va1[_XYZ][:, :, 0] *= step
             va1[_XYZ][:, :, 2] *= step
 
-            flatcolors *= 0.8
+            flatcolors = flatcolors.astype(float) * 0.8
 
             va1.view('uint8')[_RGBA] = flatcolors
             grassmask = topBlocks[nonAirBlocks] == 2
@@ -1296,7 +1635,7 @@ class GenericBlockRenderer(BlockRenderer):
             if self.materials.name in ("Alpha", "Pocket"):
                 if direction == pymclevel.faces.FaceYIncreasing:
                     grass = theseBlocks == pymclevel.materials.alphaMaterials.Grass.ID
-                    vertexArray.view('uint8')[_RGB][grass] *= self.grassColor
+                    vertexArray.view('uint8')[_RGB][grass] = vertexArray.view('uint8')[_RGB][grass].astype(float) * self.grassColor
             yield
 
             vertexArrays.append(vertexArray)
@@ -1367,12 +1706,12 @@ class LeafBlockRenderer(BlockRenderer):
 
             vertexArray.view('uint8')[_RGB] *= facingBlockLight[blockIndices][..., numpy.newaxis, numpy.newaxis]
             if self.materials.name in ("Alpha", "Pocket"):
-                vertexArray.view('uint8')[_RGB][leaves] *= self.leafColor
-                vertexArray.view('uint8')[_RGB][pines] *= self.pineLeafColor
-                vertexArray.view('uint8')[_RGB][birches] *= self.birchLeafColor
-                vertexArray.view('uint8')[_RGB][jungle] *= self.jungleLeafColor
-                vertexArray.view('uint8')[_RGB][acacia] *= self.acaciaLeafColor
-                vertexArray.view('uint8')[_RGB][darkoak] *= self.darkoakLeafColor
+                vertexArray.view('uint8')[_RGB][leaves] = vertexArray.view('uint8')[_RGB][leaves].astype(float) * self.leafColor
+                vertexArray.view('uint8')[_RGB][pines] = vertexArray.view('uint8')[_RGB][pines].astype(float) * self.pineLeafColor
+                vertexArray.view('uint8')[_RGB][birches] = vertexArray.view('uint8')[_RGB][birches].astype(float) * self.birchLeafColor
+                vertexArray.view('uint8')[_RGB][jungle] = vertexArray.view('uint8')[_RGB][jungle].astype(float) * self.jungleLeafColor
+                vertexArray.view('uint8')[_RGB][acacia] = vertexArray.view('uint8')[_RGB][acacia].astype(float) * self.acaciaLeafColor
+                vertexArray.view('uint8')[_RGB][darkoak] = vertexArray.view('uint8')[_RGB][darkoak].astype(float) * self.darkoakLeafColor
 
             yield
             arrays.append(vertexArray)
@@ -1415,7 +1754,7 @@ class PlantBlockRenderer(BlockRenderer):
         lights = blockLight[blockIndices][..., numpy.newaxis, numpy.newaxis]
 
         colorize = None
-        if self.materials.name == "Alpha":  #so hacky, someone more competent fix this
+        if self.materials.name != "Classic":  #so hacky, someone more competent fix this
             colorize = (theseBlocks == pymclevel.materials.alphaMaterials.TallGrass.ID) & (bdata != 0)
             colorize2 = (theseBlocks == pymclevel.materials.alphaMaterials.TallFlowers.ID) & (bdata != 0) & (
             bdata != 1) & (bdata != 4) & (bdata != 5)
@@ -1441,8 +1780,8 @@ class PlantBlockRenderer(BlockRenderer):
             vertexArray.view('uint8')[_RGB] = 0xf  # ignore precomputed directional light
             vertexArray.view('uint8')[_RGB] *= lights
             if colorize is not None:
-                vertexArray.view('uint8')[_RGB][colorize] *= LeafBlockRenderer.leafColor
-                vertexArray.view('uint8')[_RGB][colorize2] *= LeafBlockRenderer.leafColor
+                vertexArray.view('uint8')[_RGB][colorize] = vertexArray.view('uint8')[_RGB][colorize].astype(float) * LeafBlockRenderer.leafColor
+                vertexArray.view('uint8')[_RGB][colorize2] = vertexArray.view('uint8')[_RGB][colorize2].astype(float) * LeafBlockRenderer.leafColor
             arrays.append(vertexArray)
             yield
 
@@ -1454,8 +1793,8 @@ class PlantBlockRenderer(BlockRenderer):
 class TorchBlockRenderer(BlockRenderer):  #Levers here until someone makes a separate renderer for it.
     blocktypes = [pymclevel.materials.alphaMaterials.Torch.ID,
                   pymclevel.materials.alphaMaterials.RedstoneTorchOff.ID,
-                  pymclevel.materials.alphaMaterials.RedstoneTorchOn.ID,
-                  pymclevel.materials.alphaMaterials.Lever.ID]
+                  pymclevel.materials.alphaMaterials.RedstoneTorchOn.ID
+                  ]
     renderstate = ChunkCalculator.renderstateAlphaTest
     torchOffsetsStraight = [
         [  # FaceXIncreasing
@@ -1607,7 +1946,68 @@ class TorchBlockRenderer(BlockRenderer):  #Levers here until someone makes a sep
         self.vertexArrays = arrays
 
     makeVertices = makeTorchVertices
-
+    
+class LeverBlockRenderer(BlockRenderer):
+    blocktypes = [pymclevel.materials.alphaMaterials.Lever.ID]
+    
+    leverBaseTemplate = makeVertexTemplatesFromJsonModel((5, 0, 4), (11, 3, 12), {
+        "down": (10, 0, 16, 8),
+        "up": (10, 0, 16, 8),
+        "north": (10, 8, 16, 11),
+        "south": (10, 8, 16, 11),
+        "west": (2, 0, 10, 3),
+        "east": (2, 0, 10, 3)
+    })
+    
+    leverBaseTemplates = numpy.array([
+        rotateTemplate(leverBaseTemplate, x=180, y=90),
+        rotateTemplate(leverBaseTemplate, x=90, y=90),
+        rotateTemplate(leverBaseTemplate, x=90, y=270),
+        rotateTemplate(leverBaseTemplate, x=90, y=180),
+        rotateTemplate(leverBaseTemplate, x=270, y=180),
+        leverBaseTemplate,
+        rotateTemplate(leverBaseTemplate, y=90),
+        rotateTemplate(leverBaseTemplate, x=180),
+        rotateTemplate(leverBaseTemplate, x=180, y=90),
+        rotateTemplate(leverBaseTemplate, x=90, y=90),
+        rotateTemplate(leverBaseTemplate, x=270, y=90),
+        rotateTemplate(leverBaseTemplate, x=270),
+        rotateTemplate(leverBaseTemplate, x=270, y=180),
+        leverBaseTemplate,
+        rotateTemplate(leverBaseTemplate, y=90),
+        numpy.zeros((6, 4, 6)), numpy.zeros((6, 4, 6))
+    ])
+    
+    leverTemplate = makeVertexTemplatesFromJsonModel((7, 1, 7), (9, 11, 9), {
+        "down": (7, 6, 9, 8),
+        "up": (7, 6, 9, 8),
+        "north": (7, 6, 9, 16),
+        "south": (7, 6, 9, 16),
+        "west": (7, 6, 9, 16),
+        "east": (7, 6, 9, 16)
+    })
+    
+    leverTemplates = numpy.array([
+        rotateTemplate(leverTemplate, x=180),
+        rotateTemplate(leverTemplate, x=90, y=90),
+        rotateTemplate(leverTemplate, x=90, y=270), 
+        rotateTemplate(leverTemplate, x=90, y=180),
+        rotateTemplate(leverTemplate, x=270, y=180),
+        leverTemplate,
+        rotateTemplate(leverTemplate, y=90),
+        rotateTemplate(leverTemplate, x=180),
+        rotateTemplate(leverTemplate, x=180),
+        rotateTemplate(leverTemplate, x=90, y=90),
+        rotateTemplate(leverTemplate, x=270, y=90),
+        rotateTemplate(leverTemplate, x=270),
+        rotateTemplate(leverTemplate, x=270, y=180),
+        leverTemplate,
+        leverTemplate,
+        numpy.zeros((6, 4, 6)), numpy.zeros((6, 4, 6))
+    ])
+    
+    makeVertices = makeVerticesFromModel([leverBaseTemplates, leverTemplates], 15)
+    
 
 class RailBlockRenderer(BlockRenderer):
     blocktypes = [pymclevel.materials.alphaMaterials.Rail.ID,
@@ -1673,7 +2073,7 @@ class RailBlockRenderer(BlockRenderer):
         tex = texMap(railBlocks, bdata, pymclevel.faces.FaceYIncreasing)[:, numpy.newaxis, :]
 
         # disable 'powered' or 'pressed' bit for powered and detector rails
-        bdata[railBlocks != pymclevel.materials.alphaMaterials.Rail.ID] &= ~0x8
+        bdata[railBlocks != pymclevel.materials.alphaMaterials.Rail.ID] = bdata[railBlocks != pymclevel.materials.alphaMaterials.Rail.ID].astype(int) & ~0x8
 
         vertexArray = self.makeTemplate(direction, blockIndices)
         if not len(vertexArray):
@@ -1741,47 +2141,61 @@ class LadderBlockRenderer(BlockRenderer):
 
 class WallSignBlockRenderer(BlockRenderer):
     blocktypes = [pymclevel.materials.alphaMaterials.WallSign.ID]
-
-    wallSignOffsets = numpy.array([
-                                    [(0, 0, 0), (0, 0, 0), (0, 0, 0), (0, 0, 0)],
-                                    [(0, 0, 0), (0, 0, 0), (0, 0, 0), (0, 0, 0)],
-
-                                    [(0, -1, 0.9), (0, 0, -0.1), (0, 0, -0.1), (0, -1, 0.9)],  # facing east
-                                    [(0, 0, 0.1), (0, -1, -.9), (0, -1, -.9), (0, 0, 0.1)],  # facing west
-                                    [(.9, -1, 0), (.9, -1, 0), (-.1, 0, 0), (-.1, 0, 0)],  # north
-                                    [(0.1, 0, 0), (0.1, 0, 0), (-.9, -1, 0), (-.9, -1, 0)],  # south
-
-                                ] + [[(0, 0, 0), (0, 0, 0), (0, 0, 0), (0, 0, 0)]] * 10, dtype='float32')
-
-    wallSignTextures = numpy.array([
-                                     [(0, 192), (0, 208), (16, 208), (16, 192)],  # unknown
-                                     [(0, 192), (0, 208), (16, 208), (16, 192)],  # unknown
-
-                                     [(96, 176), (96, 160), (80, 160), (80, 176), ],  # e
-                                     [(80, 160), (80, 176), (96, 176), (96, 160), ],  # w
-                                     [(80, 176), (96, 176), (96, 160), (80, 160), ],  # n
-                                     [(96, 160), (80, 160), (80, 176), (96, 176), ],  # s
-
-                                 ] + [[(0, 192), (0, 208), (16, 208), (16, 192)]] * 10, dtype='float32')
-
-    def WallSignVertices(self, facingBlockIndices, blocks, blockMaterials, blockData, areaBlockLights, texMap):
-        blockIndices = self.getMaterialIndices(blockMaterials)
-        blockLight = areaBlockLights[1:-1, 1:-1, 1:-1]
-        yield
-        bdata = blockData[blockIndices]
-
-        vertexArray = self.makeTemplate(pymclevel.faces.FaceYIncreasing, blockIndices)
-        if not len(vertexArray):
-            return
-
-        vertexArray[_ST] = self.wallSignTextures[bdata]
-        vertexArray[_XYZ] += self.wallSignOffsets[bdata]
-        vertexArray.view('uint8')[_RGB] *= blockLight[blockIndices][..., numpy.newaxis, numpy.newaxis]
-
-        yield
-        self.vertexArrays = [vertexArray]
-
-    makeVertices = WallSignVertices
+    
+    wallSignTemplate = makeVertexTemplatesFromJsonModel((0, 4.5, 0), (16, 13.5, 2), {
+        "down": (0, 11, 18, 13),
+        "up": (0, 6, 16, 8),
+        "north": (0, 4, 16, 13),
+        "south": (0, 4, 16, 13),
+        "west": (0, 4, 2, 13),
+        "east": (10, 4, 12, 13)
+    })
+    
+    # I don't know how this sytem works and how it should be structured, but this seem to do the job
+    wallSignTemplates = numpy.array([
+        wallSignTemplate,
+        wallSignTemplate,
+        rotateTemplate(wallSignTemplate, y=180),
+        wallSignTemplate,
+        rotateTemplate(wallSignTemplate, y=90),
+        rotateTemplate(wallSignTemplate, y=270),
+        numpy.zeros((6, 4, 6)), numpy.zeros((6, 4, 6))
+    ])
+    
+    makeVertices = makeVerticesFromModel(wallSignTemplates, 7)
+    
+class StandingSignRenderer(BlockRenderer):
+    blocktypes = [pymclevel.materials.alphaMaterials.Sign.ID]
+    
+    signTemplate = makeVertexTemplatesFromJsonModel((0, 7, 7), (16, 16, 9), {
+        "down": (0, 14, 16, 16),
+        "up": (0, 12, 16, 14),
+        "north": (0, 7, 16, 16),
+        "south": (0, 7, 16, 16),
+        "west": (0, 7, 2, 16),
+        "east": (14, 7, 16, 16)
+    })
+    
+    signTemplates = numpy.array([
+        signTemplate,
+        numpy.zeros((6, 4, 6)), numpy.zeros((6, 4, 6))
+    ])
+    
+    postTemplate = makeVertexTemplatesFromJsonModel((7, 0, 7), (9, 7, 9), {
+        "down": (7, 0, 9, 6),
+        "up": (7, 0, 9, 6),
+        "north": (7, 0, 9, 6),
+        "south": (7, 0, 9, 6),
+        "west": (7, 0, 9, 6),
+        "east": (7, 0, 9, 6),
+    })
+    
+    postTemplates = numpy.array([
+        postTemplate,
+        numpy.zeros((6, 4, 6)), numpy.zeros((6, 4, 6))
+    ])
+    
+    makeVertices = makeVerticesFromModel([signTemplates, postTemplates])
 
 
 class SnowBlockRenderer(BlockRenderer):
@@ -2162,7 +2576,7 @@ class RedstoneBlockRenderer(BlockRenderer):
         bdata[bdata > 0] |= 0x80
 
         vertexArray.view('uint8')[_RGBA][..., 0] = bdata[..., numpy.newaxis]
-        vertexArray.view('uint8')[_RGBA][..., 0:3] *= [1, 0, 0]
+        vertexArray.view('uint8')[_RGBA][..., 0:3] = vertexArray.view('uint8')[_RGBA][..., 0:3] * [1, 0, 0]
 
         yield
         self.vertexArrays = [vertexArray]
@@ -2172,74 +2586,271 @@ class RedstoneBlockRenderer(BlockRenderer):
 
 # button, floor plate, door -> 1-cube features
 
+class DoorRenderer(BlockRenderer):
+    blocktypes = [pymclevel.materials.alphaMaterials.WoodenDoor.ID,
+                  pymclevel.materials.alphaMaterials.IronDoor.ID,
+                  pymclevel.materials.alphaMaterials.SpruceDoor.ID,
+                  pymclevel.materials.alphaMaterials.BirchDoor.ID,
+                  pymclevel.materials.alphaMaterials.JungleDoor.ID,
+                  pymclevel.materials.alphaMaterials.AcaciaDoor.ID,
+                  pymclevel.materials.alphaMaterials.DarkOakDoor.ID]
 
-#BUTTONS GO HERE
+    doorTemplate = makeVertexTemplatesFromJsonModel(
+        (0, 0, 0), (3, 16, 16),
+        {
+            "down": (13, 0, 16, 16),
+            # TODO handle faces that should not appear
+            "up": (13, 0, 16, 16),
+            "north": (3, 0, 0, 16),
+            "south": (0, 0, 3, 16),
+            "west": (0, 0, 16, 16),
+            "east": (16, 0, 0, 16)
+        }
+    )
+
+    doorRHTemplate = makeVertexTemplatesFromJsonModel(
+        (0, 0, 0), (3, 16, 16),
+        {
+            "down": (13, 0, 16, 16),
+            # TODO handle faces that should not appear
+            "up": (13, 0, 16, 16),
+            "north": (3, 0, 0, 16),
+            "south": (0, 0, 3, 16),
+            "west": (16, 0, 0, 16),
+            "east": (0, 0, 16, 16)
+        }
+    )
+
+    doorTemplates = numpy.array([
+        # lower hinge left
+        doorTemplate,
+        rotateTemplate(doorTemplate, y=90),
+        rotateTemplate(doorTemplate, y=180),
+        rotateTemplate(doorTemplate, y=270),
+        rotateTemplate(doorRHTemplate, y=90),
+        rotateTemplate(doorRHTemplate, y=180),
+        rotateTemplate(doorRHTemplate, y=270),
+        doorRHTemplate,
+        # upper hinge left
+        doorTemplate,
+        rotateTemplate(doorTemplate, y=90),
+        rotateTemplate(doorTemplate, y=180),
+        rotateTemplate(doorTemplate, y=270),
+        rotateTemplate(doorRHTemplate, y=90),
+        rotateTemplate(doorRHTemplate, y=180),
+        rotateTemplate(doorRHTemplate, y=270),
+        doorRHTemplate,
+        # lower hinge right
+        doorRHTemplate,
+        rotateTemplate(doorRHTemplate, y=90),
+        rotateTemplate(doorRHTemplate, y=180),
+        rotateTemplate(doorRHTemplate, y=270),
+        rotateTemplate(doorTemplate, y=270),
+        doorTemplate,
+        rotateTemplate(doorTemplate, y=90),
+        rotateTemplate(doorTemplate, y=180),
+        # upper hinge right
+        doorRHTemplate,
+        rotateTemplate(doorRHTemplate, y=90),
+        rotateTemplate(doorRHTemplate, y=180),
+        rotateTemplate(doorRHTemplate, y=270),
+        rotateTemplate(doorTemplate, y=270),
+        doorTemplate,
+        rotateTemplate(doorTemplate, y=90),
+        rotateTemplate(doorTemplate, y=180),
+    ])
+
+    makeVertices = makeVerticesFromModel(doorTemplates, 31)
+
+class ButtonRenderer(BlockRenderer):
+    blocktypes = [pymclevel.materials.alphaMaterials.Button.ID,
+                  pymclevel.materials.alphaMaterials.WoodenButton.ID]
+
+    buttonTemplate = makeVertexTemplatesFromJsonModel((5, 0, 6), (11, 2, 10), {
+        "down": (5, 6, 11, 10),
+        "up": (5, 10, 11, 6),
+        "north": (5, 14, 11, 16),
+        "south": (5, 14, 11, 16),
+        "west": (6, 14, 10, 16),
+        "east": (6, 14, 10, 16)
+    })
+
+    buttonTemplatePressed = makeVertexTemplatesFromJsonModel((5, 0, 6), (11, 1, 10), {
+        "down": (5, 6, 11, 10),
+        "up": (5, 10, 11, 6),
+        "north": (5, 15, 11, 16),
+        "south": (5, 15, 11, 16),
+        "west": (6, 15, 10, 16),
+        "east": (6, 15, 10, 16)
+    })
+
+    buttonTemplates = numpy.array([
+        rotateTemplate(buttonTemplate, 180, 0),
+        rotateTemplate(buttonTemplate, 90, 90),
+        rotateTemplate(buttonTemplate, 90, 270),
+        rotateTemplate(buttonTemplate, 90, 180),
+        rotateTemplate(buttonTemplate, 90, 0),
+        buttonTemplate,
+        numpy.zeros((6, 4, 6)), numpy.zeros((6, 4, 6)),
+        rotateTemplate(buttonTemplatePressed, 180, 0),
+        rotateTemplate(buttonTemplatePressed, 90, 90),
+        rotateTemplate(buttonTemplatePressed, 90, 270),
+        rotateTemplate(buttonTemplatePressed, 90, 180),
+        rotateTemplate(buttonTemplatePressed, 90, 0),
+        buttonTemplatePressed,
+        numpy.zeros((6, 4, 6)), numpy.zeros((6, 4, 6)),
+    ])
+
+    makeVertices = makeVerticesFromModel(buttonTemplates, 15)
+
+class TrapDoorRenderer(BlockRenderer):
+    blocktypes = [pymclevel.materials.alphaMaterials.IronTrapdoor.ID,
+                  pymclevel.materials.alphaMaterials.Trapdoor.ID]
+
+    openTemplate = makeVertexTemplatesFromJsonModel((0, 0, 13), (16, 16, 16), {
+        "down": (0, 13, 16, 16),
+        "up": (0, 16, 16, 13),
+        "north": (0, 0, 16, 16),
+        "south": (0, 0, 16, 16),
+        "west": (16, 0, 13, 16),
+        "east": (13, 0, 16, 16)
+    })
+
+    topTemplate = makeVertexTemplatesFromJsonModel((0, 13, 0), (16, 16, 16), {
+        "down": (0, 0, 16, 16),
+        "up": (0, 0, 16, 16),
+        "north": (0, 16, 16, 13),
+        "south": (0, 16, 16, 13),
+        "west": (0, 16, 16, 13),
+        "east": (0, 16, 16, 13)
+    })
+
+    bottomTemplate = makeVertexTemplatesFromJsonModel((0, 0, 0), (16, 3, 16), {
+        "down": (0, 0, 16, 16),
+        "up": (0, 0, 16, 16),
+        "north": (0, 16, 16, 13),
+        "south": (0, 16, 16, 13),
+        "west": (0, 16, 16, 13),
+        "east": (0, 16, 16, 13)
+    })
+
+    trapDoorTemplates = numpy.array([
+        bottomTemplate,
+        bottomTemplate,
+        bottomTemplate,
+        bottomTemplate,
+        openTemplate,
+        rotateTemplate(openTemplate, y=180),
+        rotateTemplate(openTemplate, y=270),
+        rotateTemplate(openTemplate, y=90),
+        topTemplate,
+        topTemplate,
+        topTemplate,
+        topTemplate,
+        openTemplate,
+        rotateTemplate(openTemplate, y=180),
+        rotateTemplate(openTemplate, y=270),
+        rotateTemplate(openTemplate, y=90),
+    ])
+
+    makeVertices = makeVerticesFromModel(trapDoorTemplates, 15)
 
 
-class FenceBlockRenderer(BlockRenderer):  #This code is written to only accept one texture. Fix me.
+class FenceBlockRenderer(BlockRenderer):
     blocktypes = [pymclevel.materials.alphaMaterials.Fence.ID,
                   pymclevel.materials.alphaMaterials.SpruceFence.ID,
                   pymclevel.materials.alphaMaterials.BirchFence.ID,
                   pymclevel.materials.alphaMaterials.JungleFence.ID,
                   pymclevel.materials.alphaMaterials.DarkOakFence.ID,
-                  pymclevel.materials.alphaMaterials.AcaciaFence.ID
-    ]
+                  pymclevel.materials.alphaMaterials.AcaciaFence.ID,
+                  pymclevel.materials.alphaMaterials.NetherBrickFence.ID]
     fenceTemplates = makeVertexTemplates(3 / 8., 0, 3 / 8., 5 / 8., 1, 5 / 8.)
 
-    def fenceVertices(self, facingBlockIndices, blocks, blockMaterials, blockData, areaBlockLights, texMap):
+    makeVertices = makeVerticesFromModel(fenceTemplates)
+
+
+class FenceGateBlockRenderer(BlockRenderer):
+    blocktypes = [pymclevel.materials.alphaMaterials.FenceGate.ID,
+                  pymclevel.materials.alphaMaterials.SpruceFenceGate.ID,
+                  pymclevel.materials.alphaMaterials.BirchFenceGate.ID,
+                  pymclevel.materials.alphaMaterials.JungleFenceGate.ID,
+                  pymclevel.materials.alphaMaterials.DarkOakFenceGate.ID,
+                  pymclevel.materials.alphaMaterials.AcaciaFenceGate.ID
+    ]
+    closedFenceTemplates = numpy.array([
+        makeVertexTemplates(0, 0, 3 / 8., 1, .8, 5 / 8.),
+        makeVertexTemplates(3 / 8., 0, 0, 5 / 8., .8, 1)])
+
+    openFenceTemplates = numpy.array([
+        [makeVertexTemplates(0, 0, 3 / 8., 1 / 8., .8, 1),
+         makeVertexTemplates(7 / 8., 0, 3 / 8., 1, .8, 1)],
+        [makeVertexTemplates(0, 0, 0, 5 / 8., .8, 1 / 8.),
+         makeVertexTemplates(0, 0, 7 / 8., 5 / 8., .8, 1)],
+        [makeVertexTemplates(0, 0, 0, 1 / 8., .8, 5 / 8.),
+         makeVertexTemplates(7 / 8., 0, 0, 1, .8, 5 / 8.)],
+        [makeVertexTemplates(3 / 8., 0, 0, 1, .8, 1 / 8.),
+         makeVertexTemplates(3 / 8., 0, 7 / 8., 1, .8, 1)]])
+
+    def fenceGateVertices(self, facingBlockIndices, blocks, blockMaterials, blockData, areaBlockLights, texMap):
         fenceMask = self.getMaterialIndices(blockMaterials)
-        fenceIndices = fenceMask.nonzero()
+        closedGateMask = fenceMask.copy()
+        closedGateMask[blockData & 4 == 4] = 0
+        openGateMask = fenceMask.copy()
+        openGateMask[blockData & 4 == 0] = 0
+        closedGateIndices = closedGateMask.nonzero()
+        openGateIndices = openGateMask.nonzero()
+
+        closedGateData = blockData[closedGateMask]
+        closedGateData &= 1
+
+        openGateData = blockData[openGateMask]
+        openGateData &= 3
+
         yield
 
-        vertexArray = numpy.zeros((len(fenceIndices[0]), 6, 4, 6), dtype='float32')
+        # closed gate
+        vertexArray = numpy.zeros((len(closedGateIndices[0]), 6, 4, 6), dtype='float32')
         for indicies in range(3):
             dimension = (0, 2, 1)[indicies]
 
-            vertexArray[..., indicies] = fenceIndices[dimension][:, numpy.newaxis,
+            vertexArray[..., indicies] = closedGateIndices[dimension][:, numpy.newaxis,
                                          numpy.newaxis]  # xxx swap z with y using ^
 
-        vertexArray[..., 0:5] += self.fenceTemplates[..., 0:5]
-        vertexArray[_ST] += pymclevel.materials.alphaMaterials.blockTextures[blocks[fenceIndices][0], 0, 0]
+        vertexArray[..., 0:5] += self.closedFenceTemplates[closedGateData][..., 0:5]
 
-        vertexArray.view('uint8')[_RGB] = self.fenceTemplates[..., 5][..., numpy.newaxis]
+        vertexArray[_ST] += texMap(blocks[closedGateIndices], 0)[..., numpy.newaxis, :]
+
+        vertexArray.view('uint8')[_RGB] = self.closedFenceTemplates[closedGateData][..., 5][..., numpy.newaxis]
         vertexArray.view('uint8')[_A] = 0xFF
-        vertexArray.view('uint8')[_RGB] *= areaBlockLights[1:-1, 1:-1, 1:-1][fenceIndices][
+        vertexArray.view('uint8')[_RGB] *= areaBlockLights[1:-1, 1:-1, 1:-1][closedGateIndices][
             ..., numpy.newaxis, numpy.newaxis, numpy.newaxis]
         vertexArray.shape = (vertexArray.shape[0] * 6, 4, 6)
         yield
         self.vertexArrays = [vertexArray]
 
-    makeVertices = fenceVertices
+        # open gate
+        for i in range(2):
+            vertexArray = numpy.zeros((len(openGateIndices[0]), 6, 4, 6), dtype='float32')
+            for indicies in range(3):
+                dimension = (0, 2, 1)[indicies]
 
+                vertexArray[..., indicies] = openGateIndices[dimension][:, numpy.newaxis,
+                                             numpy.newaxis]  # xxx swap z with y using ^
 
-class NetherFenceBlockRenderer(BlockRenderer):
-    blocktypes = [pymclevel.materials.alphaMaterials.NetherBrickFence.ID]
-    fenceTemplates = makeVertexTemplates(3 / 8., 0, 3 / 8., 5 / 8., 1, 5 / 8.)
+            vertexArray[..., 0:5] += self.openFenceTemplates[openGateData, i][..., 0:5]
 
-    def fenceVertices(self, facingBlockIndices, blocks, blockMaterials, blockData, areaBlockLights, texMap):
-        fenceMask = self.getMaterialIndices(blockMaterials)
-        fenceIndices = fenceMask.nonzero()
-        yield
+            vertexArray[_ST] += texMap(blocks[openGateIndices], 0)[..., numpy.newaxis, :]
 
-        vertexArray = numpy.zeros((len(fenceIndices[0]), 6, 4, 6), dtype='float32')
-        for indicies in range(3):
-            dimension = (0, 2, 1)[indicies]
+            vertexArray.view('uint8')[_RGB] = self.openFenceTemplates[openGateData, i] \
+                [..., 5][..., numpy.newaxis]
+            vertexArray.view('uint8')[_A] = 0xFF
+            vertexArray.view('uint8')[_RGB] *= areaBlockLights[1:-1, 1:-1, 1:-1][openGateIndices][
+                ..., numpy.newaxis, numpy.newaxis, numpy.newaxis]
+            vertexArray.shape = (vertexArray.shape[0] * 6, 4, 6)
+            yield
+            self.vertexArrays.append(vertexArray)
 
-            vertexArray[..., indicies] = fenceIndices[dimension][:, numpy.newaxis, numpy.newaxis]
-
-        vertexArray[..., 0:5] += self.fenceTemplates[..., 0:5]
-        vertexArray[_ST] += pymclevel.materials.alphaMaterials.blockTextures[
-            pymclevel.materials.alphaMaterials.NetherBrickFence.ID, 0, 0]
-
-        vertexArray.view('uint8')[_RGB] = self.fenceTemplates[..., 5][..., numpy.newaxis]
-        vertexArray.view('uint8')[_A] = 0xFF
-        vertexArray.view('uint8')[_RGB] *= areaBlockLights[1:-1, 1:-1, 1:-1][fenceIndices][
-            ..., numpy.newaxis, numpy.newaxis, numpy.newaxis]
-        vertexArray.shape = (vertexArray.shape[0] * 6, 4, 6)
-        yield
-        self.vertexArrays = [vertexArray]
-
-    makeVertices = fenceVertices
+    makeVertices = fenceGateVertices
 
 
 class StairBlockRenderer(BlockRenderer):
@@ -2335,7 +2946,7 @@ class VineBlockRenderer(BlockRenderer):
         lights = blockLight[blockIndices][..., numpy.newaxis, numpy.newaxis]
         vertexArray.view('uint8')[_RGB] *= lights
 
-        vertexArray.view('uint8')[_RGB] *= LeafBlockRenderer.leafColor
+        vertexArray.view('uint8')[_RGB] = vertexArray.view('uint8')[_RGB].astype(float) * LeafBlockRenderer.leafColor
 
         if direction == pymclevel.faces.FaceZIncreasing:
             vertexArray[_XYZ][..., 2] -= 0.0625
@@ -2354,7 +2965,8 @@ class VineBlockRenderer(BlockRenderer):
 class SlabBlockRenderer(BlockRenderer):
     blocktypes = [pymclevel.materials.alphaMaterials.OakWoodSlab.ID,
                   pymclevel.materials.alphaMaterials.StoneSlab.ID,
-                  pymclevel.materials.alphaMaterials.RedSandstoneSlab.ID]
+                  pymclevel.materials.alphaMaterials.RedSandstoneSlab.ID,
+                  pymclevel.materials.alphaMaterials.PurpurSlab.ID]
 
     def slabFaceVertices(self, direction, blockIndices, facingBlockLight, blocks, blockData, blockLight,
                          areaBlockLights, texMap):
@@ -2384,6 +2996,50 @@ class SlabBlockRenderer(BlockRenderer):
 
     makeFaceVertices = slabFaceVertices
 
+
+# 1.9 renderer's
+class EndRodRenderer(BlockRenderer):
+    blocktypes = [pymclevel.materials.alphaMaterials.EndRod.ID]
+
+    rodTemplate = makeVertexTemplatesFromJsonModel((7, 1, 7), (9, 16, 9), {
+        "down": (4, 2, 2, 0),
+        "up": (2, 0, 4, 2),
+        "north": (0, 0, 2, 15),
+        "south": (0, 0, 2, 15),
+        "west": (0, 0, 2, 15),
+        "east": (0, 0, 2, 15)
+    })
+
+    rodTemplates = numpy.array([
+        rotateTemplate(rodTemplate, x=180),
+        rodTemplate,
+        rotateTemplate(rodTemplate, x=90),
+        rotateTemplate(rodTemplate, y=180, x=90),
+        rotateTemplate(rodTemplate, y=270, x=90),
+        rotateTemplate(rodTemplate, y=90, x=90),
+        numpy.zeros((6, 4, 6)), numpy.zeros((6, 4, 6))
+    ])
+
+    handleTemplate = makeVertexTemplatesFromJsonModel((6, 0, 6), (10, 1, 10), {
+        "down": (6, 6, 2, 2),
+        "up": (2, 2, 6, 6),
+        "north": (2, 6, 6, 7),
+        "south": (2, 6, 6, 7),
+        "west": (2, 6, 6, 7),
+        "east": (2, 6, 6, 7)
+    })
+
+    handleTemplates = numpy.array([
+        rotateTemplate(handleTemplate, x=180),
+        handleTemplate,
+        rotateTemplate(handleTemplate, x=90),
+        rotateTemplate(handleTemplate, y=180, x=90),
+        rotateTemplate(handleTemplate, y=270, x=90),
+        rotateTemplate(handleTemplate, y=90, x=90),
+        numpy.zeros((6, 4, 6)), numpy.zeros((6, 4, 6))
+    ])
+
+    makeVertices = makeVerticesFromModel([rodTemplates, handleTemplates], 7)
 
 class WaterBlockRenderer(BlockRenderer):
     waterID = pymclevel.materials.alphaMaterials.Water.ID

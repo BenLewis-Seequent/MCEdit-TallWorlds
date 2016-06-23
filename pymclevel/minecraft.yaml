@@ -1412,7 +1412,7 @@ blocks:
     data:
       0:
         tex: [0, 4]
-        name: White Wool (White)
+        name: Wool (White)
         mapcolor: [222, 222, 222]
       1:
         tex: [2, 13]
@@ -1992,7 +1992,7 @@ blocks:
         name: Wheat (Age 6)
         tex: [14, 5]
       7: 
-        name: Wheat (Age 7)
+        name: Wheat (Age 7 (Max))
         tex: [15, 5]
 
   - id: 60
@@ -2141,20 +2141,28 @@ blocks:
     data:
       0:
         name: Oak Door (Lower, Unopened, East)
+        tex: [1, 6]
       1:
         name: Oak Door (Lower, Unopened, South)
+        tex: [1, 6]
       2:
         name: Oak Door (Lower, Unopened, West)
+        tex: [1, 6]
       3:
         name: Oak Door (Lower, Unopened, North)
+        tex: [1, 6]
       4:
         name: Oak Door (Lower, Opened, East)
+        tex: [1, 6]
       5:
         name: Oak Door (Lower, Opened, South)
+        tex: [1, 6]
       6:
         name: Oak Door (Lower, Opened, West)
+        tex: [1, 6]
       7:
         name: Oak Door (Lower, Opened, North)
+        tex: [1, 6]
       8:
         name: Oak Door (Upper, Left Hinge, Unpowered)
       9:
@@ -2163,6 +2171,21 @@ blocks:
         name: Oak Door (Upper, Left Hinge, Powered)
       11:
         name: Oak Door (Upper, Right Hinge, Powered)
+# the following only exist inside MCEdits rendering system
+# to represent door states that aren't encoded into minecraft's
+# metadata like (Upper, Left Hinge, Closed, East)
+      12:
+        tex: [1, 5]
+        invalid: true
+      13:
+        tex: [1, 5]
+        invalid: true
+      14:
+        tex: [1, 5]
+        invalid: true
+      15:
+        tex: [1, 5]
+        invalid: true
 
   - id: 65
     idStr: ladder
@@ -2322,20 +2345,28 @@ blocks:
     data:
       0:
         name: Iron Door (Lower, Unopened, East)
+        tex: [2, 6]
       1:
         name: Iron Door (Lower, Unopened, South)
+        tex: [2, 6]
       2:
         name: Iron Door (Lower, Unopened, West)
+        tex: [2, 6]
       3:
         name: Iron Door (Lower, Unopened, North)
+        tex: [2, 6]
       4:
         name: Iron Door (Lower, Opened, East)
+        tex: [2, 6]
       5:
         name: Iron Door (Lower, Opened, South)
+        tex: [2, 6]
       6:
         name: Iron Door (Lower, Opened, West)
+        tex: [2, 6]
       7:
         name: Iron Door (Lower, Opened, North)
+        tex: [2, 6]
       8:
         name: Iron Door (Upper, Left Hinge, Unpowered)
       9:
@@ -2344,6 +2375,21 @@ blocks:
         name: Iron Door (Upper, Left Hinge, Powered)
       11:
         name: Iron Door (Upper, Right Hinge, Powered)
+# the following only exist inside MCEdits rendering system
+# to represent door states that aren't encoded into minecraft's
+# metadata like (Upper, Left Hinge, Closed, East)
+      12:
+        tex: [2, 5]
+        invalid: true
+      13:
+        tex: [2, 5]
+        invalid: true
+      14:
+        tex: [2, 5]
+        invalid: true
+      15:
+        tex: [2, 5]
+        invalid: true
 
   - id: 72
     idStr: wooden_pressure_plate
@@ -2417,7 +2463,7 @@ blocks:
     idStr: stone_button
     name: Stone Button
     mapcolor: [120, 120, 120]
-    tex: [19, 8]
+    tex: [1, 0]
     type: BUTTON
     opacity: 0
     data:
@@ -2803,7 +2849,6 @@ blocks:
     tex: [3, 9]
     type: THINSLICE
     opacity: 0
-    brightness: 9
     data:
       0: 
         name: Redstone Repeater (Powered, Delay 1, North)
@@ -3018,6 +3063,7 @@ blocks:
     data:
       0:
         name: Stone Bricks
+        search: block
         tex: [6, 3]
       1:
         name: Mossy Stone Bricks
@@ -3385,6 +3431,8 @@ blocks:
     mapcolor: [157, 128, 79]
     tex: [21, 0]
     type: FENCE_GATE
+    tex_direction:
+      TOP: [4, 0]
     opacity: 0
     data:
       0:
@@ -3531,19 +3579,20 @@ blocks:
     mapcolor: [112, 8, 28]
     tex: [4, 14]
     type: NETHER_WART
-    tex_extra:
-      smaller_1: [3, 14]
-      smaller_2: [2, 14]
     opacity: 0
     data:
       0:
         name: Nether Wart (Age 0)
+        tex: [2, 14]
       1:
         name: Nether Wart (Age 1)
+        tex: [3, 14]
       2:
         name: Nether Wart (Age 2)
+        tex: [3, 14]
       3:
         name: Nether Wart (Age 3)
+        tex: [4, 14]
 
   - id: 116
     idStr: enchanting_table
@@ -4017,19 +4066,111 @@ blocks:
   - id: 137
     idStr: command_block
     name: Command Block
+    search: Impulse
     mapcolor: [200, 200, 200]
-    tex: [8, 11]
+    tex: [22, 3]
     data:
       0:
-        name: Command Block
+        name: Command Block (Not Conditional, Down)
+        tex_direction:
+          FORWARD: [29, 4]
+          SIDES: [29, 4]
+          BACKWARD: [29, 4]
+          BOTTOM: [22, 0]
       1:
-        name: Command Block (Triggered)
+        name: Command Block (Not Conditional, Up)
+        tex_direction:
+          FORWARD: [27, 4]
+          SIDES: [27, 4]
+          BACKWARD: [27, 4]
+          TOP: [22, 0]
+      2:
+        name: Command Block (Not Conditional, North)
+        tex_direction:
+          FORWARD: [22, 0]
+          LEFT: [30, 4]
+          RIGHT: [28, 4]
+          TOP: [27, 4]
+          BOTTOM: [27, 4]
+      3:
+        name: Command Block (Not Conditional, South)
+        tex_direction:
+          LEFT: [28, 4]
+          RIGHT: [30, 4]
+          BACKWARD: [22, 0]
+          TOP: [29, 4]
+          BOTTOM: [29, 4]
+      4:
+        name: Command Block (Not Conditional, West)
+        tex_direction:
+          FORWARD: [28, 4]
+          LEFT: [22, 0]
+          BACKWARD: [30, 4]
+          TOP: [30, 4]
+          BOTTOM: [30, 4]
+      5:
+        name: Command Block (Not Conditional, East)
+        tex_direction:
+          FORWARD: [30, 4]
+          RIGHT: [22, 0]
+          BACKWARD: [28, 4]
+          TOP: [28, 4]
+          BOTTOM: [28, 4]
+      8:
+        name: Command Block (Conditional, Down)
+        tex_direction:
+          FORWARD: [25, 4]
+          SIDES: [25, 4]
+          BACKWARD: [25, 4]
+          BOTTOM: [22, 0]
+      9:
+        name: Command Block (Conditional, Up)
+        tex_direction:
+          FORWARD: [23, 4]
+          SIDES: [23, 4]
+          BACKWARD: [23, 4]
+          TOP: [22, 0]
+      10:
+        name: Command Block (Conditional, North)
+        tex_direction:
+          FORWARD: [22, 0]
+          LEFT: [26, 4]
+          RIGHT: [24, 4]
+          TOP: [23, 4]
+          BOTTOM: [23, 4]
+      11:
+        name: Command Block (Conditional, South)
+        tex_direction:
+          LEFT: [24, 4]
+          RIGHT: [26, 4]
+          BACKWARD: [22, 0]
+          TOP: [25, 4]
+          BOTTOM: [25, 4]
+      12:
+        name: Command Block (Conditional, West)
+        tex_direction:
+          FORWARD: [24, 4]
+          LEFT: [22, 0]
+          BACKWARD: [26, 4]
+          TOP: [26, 4]
+          BOTTOM: [26, 4]
+      13:
+        name: Command Block (Conditional, East)
+        tex_direction:
+          FORWARD: [26, 4]
+          RIGHT: [22, 0]
+          BACKWARD: [24, 4]
+          TOP: [24, 4]
+          BOTTOM: [24, 4]
 
   - id: 138
     idStr: beacon
     name: Beacon
     mapcolor: [200, 200, 200]
-    tex: [9, 2]
+    tex: [20, 6]
+    tex_direction:
+        TOP: [20, 7]
+        BOTTOM: [20, 8]
     opacity: 0
     brightness: 15
 
@@ -4159,7 +4300,7 @@ blocks:
     idStr: wooden_button
     name: Wooden Button
     mapcolor: [200, 100, 100]
-    tex: [19, 7]
+    tex: [4, 0]
     type: BUTTON
     opacity: 0
     data:
@@ -5594,6 +5735,8 @@ blocks:
     name: Spruce Fence Gate
     mapcolor: [157, 128, 79]
     tex: [21, 1]
+    tex_direction:
+      TOP: [6, 12]
     type: FENCE_GATE
     opacity: 0
     data:
@@ -5635,6 +5778,8 @@ blocks:
     name: Birch Fence Gate
     mapcolor: [157, 128, 79]
     tex: [21, 2]
+    tex_direction:
+      TOP: [6, 13]
     type: FENCE_GATE
     opacity: 0
     data:
@@ -5676,6 +5821,8 @@ blocks:
     name: Jungle Fence Gate
     mapcolor: [157, 128, 79]
     tex: [21, 3]
+    tex_direction:
+      TOP: [7, 12]
     type: FENCE_GATE
     opacity: 0
     data:
@@ -5717,6 +5864,8 @@ blocks:
     name: Dark Oak Fence Gate
     mapcolor: [157, 128, 79]
     tex: [21, 5]
+    tex_direction:
+      TOP: [1, 15]
     type: FENCE_GATE
     opacity: 0
     data:
@@ -5758,6 +5907,8 @@ blocks:
     name: Acacia Fence Gate
     mapcolor: [157, 128, 79]
     tex: [21, 4]
+    tex_direction:
+      TOP: [0, 15]
     type: FENCE_GATE
     opacity: 0
     data:
@@ -5838,20 +5989,28 @@ blocks:
     data:
       0:
         name: Spruce Door (Lower, Unopened, East)
+        tex: [5, 21]
       1:
         name: Spruce Door (Lower, Unopened, South)
+        tex: [5, 21]
       2:
         name: Spruce Door (Lower, Unopened, West)
+        tex: [5, 21]
       3:
         name: Spruce Door (Lower, Unopened, North)
+        tex: [5, 21]
       4:
         name: Spruce Door (Lower, Opened, East)
+        tex: [5, 21]
       5:
         name: Spruce Door (Lower, Opened, South)
+        tex: [5, 21]
       6:
         name: Spruce Door (Lower, Opened, West)
+        tex: [5, 21]
       7:
         name: Spruce Door (Lower, Opened, North)
+        tex: [5, 21]
       8:
         name: Spruce Door (Upper, Left Hinge, Unpowered)
       9:
@@ -5860,7 +6019,22 @@ blocks:
         name: Spruce Door (Upper, Left Hinge, Powered)
       11:
         name: Spruce Door (Upper, Right Hinge, Powered)
-    
+# the following only exist inside MCEdits rendering system
+# to represent door states that aren't encoded into minecraft's
+# metadata like (Upper, Left Hinge, Closed, East)
+      12:
+        tex: [5, 20]
+        invalid: true
+      13:
+        tex: [5, 20]
+        invalid: true
+      14:
+        tex: [5, 20]
+        invalid: true
+      15:
+        tex: [5, 20]
+        invalid: true
+
   - id: 194
     idStr: birch_door
     name: Birch Door
@@ -5870,20 +6044,28 @@ blocks:
     data:
       0:
         name: Birch Door (Lower, Unopened, East)
+        tex: [6, 21]
       1:
         name: Birch Door (Lower, Unopened, South)
+        tex: [6, 21]
       2:
         name: Birch Door (Lower, Unopened, West)
+        tex: [6, 21]
       3:
         name: Birch Door (Lower, Unopened, North)
+        tex: [6, 21]
       4:
         name: Birch Door (Lower, Opened, East)
+        tex: [6, 21]
       5:
         name: Birch Door (Lower, Opened, South)
+        tex: [6, 21]
       6:
         name: Birch Door (Lower, Opened, West)
+        tex: [6, 21]
       7:
         name: Birch Door (Lower, Opened, North)
+        tex: [6, 21]
       8:
         name: Birch Door (Upper, Left Hinge, Unpowered)
       9:
@@ -5892,7 +6074,22 @@ blocks:
         name: Birch Door (Upper, Left Hinge, Powered)
       11:
         name: Birch Door (Upper, Right Hinge, Powered)
-  
+# the following only exist inside MCEdits rendering system
+# to represent door states that aren't encoded into minecraft's
+# metadata like (Upper, Left Hinge, Closed, East)
+      12:
+        tex: [6, 20]
+        invalid: true
+      13:
+        tex: [6, 20]
+        invalid: true
+      14:
+        tex: [6, 20]
+        invalid: true
+      15:
+        tex: [6, 20]
+        invalid: true
+
   - id: 195
     idStr: jungle_door
     name: Jungle Door
@@ -5902,20 +6099,28 @@ blocks:
     data:
       0:
         name: Jungle Door (Lower, Unopened, East)
+        tex: [7, 21]
       1:
         name: Jungle Door (Lower, Unopened, South)
+        tex: [7, 21]
       2:
         name: Jungle Door (Lower, Unopened, West)
+        tex: [7, 21]
       3:
         name: Jungle Door (Lower, Unopened, North)
+        tex: [7, 21]
       4:
         name: Jungle Door (Lower, Opened, East)
+        tex: [7, 21]
       5:
         name: Jungle Door (Lower, Opened, South)
+        tex: [7, 21]
       6:
         name: Jungle Door (Lower, Opened, West)
+        tex: [7, 21]
       7:
         name: Jungle Door (Lower, Opened, North)
+        tex: [7, 21]
       8:
         name: Jungle Door (Upper, Left Hinge, Unpowered)
       9:
@@ -5924,6 +6129,21 @@ blocks:
         name: Jungle Door (Upper, Left Hinge, Powered)
       11:
         name: Jungle Door (Upper, Right Hinge, Powered)
+# the following only exist inside MCEdits rendering system
+# to represent door states that aren't encoded into minecraft's
+# metadata like (Upper, Left Hinge, Closed, East)
+      12:
+        tex: [7, 20]
+        invalid: true
+      13:
+        tex: [7, 20]
+        invalid: true
+      14:
+        tex: [7, 20]
+        invalid: true
+      15:
+        tex: [7, 20]
+        invalid: true
 
   - id: 196
     idStr: acacia_door
@@ -5934,20 +6154,28 @@ blocks:
     data:
       0:
         name: Acacia Door (Lower, Unopened, East)
+        tex: [8, 21]
       1:
         name: Acacia Door (Lower, Unopened, South)
+        tex: [8, 21]
       2:
         name: Acacia Door (Lower, Unopened, West)
+        tex: [8, 21]
       3:
         name: Acacia Door (Lower, Unopened, North)
+        tex: [8, 21]
       4:
         name: Acacia Door (Lower, Opened, East)
+        tex: [8, 21]
       5:
         name: Acacia Door (Lower, Opened, South)
+        tex: [8, 21]
       6:
         name: Acacia Door (Lower, Opened, West)
+        tex: [8, 21]
       7:
         name: Acacia Door (Lower, Opened, North)
+        tex: [8, 21]
       8:
         name: Acacia Door (Upper, Left Hinge, Unpowered)
       9:
@@ -5956,7 +6184,22 @@ blocks:
         name: Acacia Door (Upper, Left Hinge, Powered)
       11:
         name: Acacia Door (Upper, Right Hinge, Powered)
-    
+# the following only exist inside MCEdits rendering system
+# to represent door states that aren't encoded into minecraft's
+# metadata like (Upper, Left Hinge, Closed, East)
+      12:
+        tex: [8, 20]
+        invalid: true
+      13:
+        tex: [8, 20]
+        invalid: true
+      14:
+        tex: [8, 20]
+        invalid: true
+      15:
+        tex: [8, 20]
+        invalid: true
+
   - id: 197
     idStr: dark_oak_door
     name: Dark Oak Door
@@ -5966,20 +6209,28 @@ blocks:
     data:
       0:
         name: Dark Oak Door (Lower, Unopened, East)
+        tex: [9, 21]
       1:
         name: Dark Oak Door (Lower, Unopened, South)
+        tex: [9, 21]
       2:
         name: Dark Oak Door (Lower, Unopened, West)
+        tex: [9, 21]
       3:
         name: Dark Oak Door (Lower, Unopened, North)
+        tex: [9, 21]
       4:
         name: Dark Oak Door (Lower, Opened, East)
+        tex: [9, 21]
       5:
         name: Dark Oak Door (Lower, Opened, South)
+        tex: [9, 21]
       6:
         name: Dark Oak Door (Lower, Opened, West)
+        tex: [9, 21]
       7:
         name: Dark Oak Door (Lower, Opened, North)
+        tex: [9, 21]
       8:
         name: Dark Oak Door (Upper, Left Hinge, Unpowered)
       9:
@@ -5988,3 +6239,459 @@ blocks:
         name: Dark Oak Door (Upper, Left Hinge, Powered)
       11:
         name: Dark Oak Door (Upper, Right Hinge, Powered)
+# the following only exist inside MCEdits rendering system
+# to represent door states that aren't encoded into minecraft's
+# metadata like (Upper, Left Hinge, Closed, East)
+      12:
+        tex: [9, 20]
+        invalid: true
+      13:
+        tex: [9, 20]
+        invalid: true
+      14:
+        tex: [9, 20]
+        invalid: true
+      15:
+        tex: [9, 20]
+        invalid: true
+    
+  - id: 198
+    idStr: end_rod
+    name: End Rod
+    mapcolor: [120, 120, 120]
+    tex: [16, 20]
+    brightness: 14
+    data:
+      0:
+        name: End Rod (Down)
+      1:
+        name: End Rod (Up)
+      2:
+        name: End Rod (North)
+      3:
+        name: End Rod (South)
+      4:
+        name: End Rod (West)
+      5:
+        name: End Rod (East)
+
+  - id: 199
+    idStr: chorus_plant
+    name: Chorus Plant
+    mapcolor: [120, 120, 120]
+    tex: [13, 20]
+        
+  - id: 200
+    idStr: chorus_flower
+    name: Chorus Flower
+    mapcolor: [120, 120, 120]
+    tex: [15, 20]
+    data:
+      0:
+        name: Chorus Flower (Age 0)
+        tex: [15, 20]
+      1:
+        name: Chorus Flower (Age 1)
+        tex: [15, 20]
+      2:
+        name: Chorus Flower (Age 2)
+        tex: [15, 20]
+      3:
+        name: Chorus Flower (Age 3)
+        tex: [15, 20]
+      4:
+        name: Chorus Flower (Age 4)
+        tex: [15, 20]
+      5:
+        name: Chorus Flower (Age 5)
+        tex: [14, 20]
+        
+  - id: 201
+    idStr: purpur_block
+    name: Purpur Block
+    mapcolor: [120, 120, 120]
+    tex: [18, 19]
+    
+  - id: 202
+    idStr: purpur_pillar
+    name: Purpur Pillar
+    mapcolor: [120, 120, 120]
+    tex: [0, 0]
+    data:
+      0:
+        name: Purpur Pillar (Upright)
+        tex: [19, 17]
+        tex_direction:
+          TOP: [19, 18]
+          BOTTOM: [19, 18]
+      4:
+        name: Purpur Pillar (East/West)
+        tex: [19, 19]
+        tex_direction:
+          SIDES: [19, 18]
+      8:
+        name: Purpur Pillar (North/South)
+        tex: [19, 17]
+        tex_direction:
+          FORWARD: [19, 18]
+          BACKWARD: [19, 18]
+          SIDES: [19, 19]
+          
+  - id: 203
+    idStr: purpur_stairs
+    name: Purpur Staris
+    mapcolor: [120, 120, 120]
+    tex: [18, 19]
+    type: STAIRS
+    data:
+      0:
+        name: Purpur Stairs (Bottom, East)
+      1:
+        name: Purpur Stairs (Bottom, West)
+      2:
+        name: Purpur Stairs (Bottom, South)
+      3:
+        name: Purpur Stairs (Bottom, North)
+      4:
+        name: Purpur Stairs (Top, East)
+      5:
+        name: Purpur Stairs (Top, West)
+      6:
+        name: Purpur Stairs (Top, South)
+      7:
+        name: Purpur Stairs (Top, North)
+        
+  - id: 204
+    idStr: <unknown>
+    name: Double Purpur Slabs
+    mapcolor: [120, 120, 120]
+    tex: [18, 19]
+    
+  - id: 205
+    idStr: purpur_slab
+    name: Purpur Slab
+    mapcolor: [120, 120, 120]
+    tex: [18, 19]
+    
+  - id: 206
+    idStr: end_bricks
+    name: End Stone Bricks
+    mapcolor: [120, 120, 120]
+    tex: [18, 18]
+
+  - id: 207
+    idStr: beetroots
+    name: Beetroot
+    mapcolor: [120, 120, 120]
+    type: CROPS
+    data:
+      0:
+        name: Beetroot (Age 0)
+        tex: [2, 29]
+      1:
+        name: Beetroot (Age 1)
+        tex: [3, 29]
+      2:
+        name: Beetroot (Age 2)
+        tex: [4, 29]
+      3:
+        name: Beetroot (Age 3)
+        tex: [5, 29]
+
+  - id: 208
+    idStr: grass_path
+    name: Path
+    tex_direction:
+      FORWARD: [1, 29]
+      BACKWARD: [1, 29]
+      LEFT: [1, 29]
+      RIGHT: [1, 29]
+      TOP: [0, 29]
+      BOTTOM: [2, 0]
+
+  - id: 209
+    isStr: end_gateway
+    name: End Gateway
+    tex: [16, 15]
+    brightness: 15
+
+  - id: 210
+    idStr: repeating_command_block
+    name: Repeating Command Block
+    mapcolor: [200, 200, 200]
+    tex: [22, 4]
+    data:
+      0:
+        name: Repeating Command Block (Not Conditional, Down)
+        tex_direction:
+          FORWARD: [29, 5]
+          SIDES: [29, 5]
+          BACKWARD: [29, 5]
+          BOTTOM: [22, 1]
+      1:
+        name: Repeating Command Block (Not Conditional, Up)
+        tex_direction:
+          FORWARD: [27, 5]
+          SIDES: [27, 5]
+          BACKWARD: [27, 5]
+          TOP: [22, 1]
+      2:
+        name: Repeating Command Block (Not Conditional, North)
+        tex_direction:
+          FORWARD: [22, 1]
+          LEFT: [30, 5]
+          RIGHT: [28, 5]
+          TOP: [27, 5]
+          BOTTOM: [27, 5]
+      3:
+        name: Repeating Command Block (Not Conditional, South)
+        tex_direction:
+          LEFT: [28, 5]
+          RIGHT: [30, 5]
+          BACKWARD: [22, 1]
+          TOP: [29, 5]
+          BOTTOM: [29, 5]
+      4:
+        name: Repeating Command Block (Not Conditional, West)
+        tex_direction:
+          FORWARD: [28, 5]
+          LEFT: [22, 1]
+          BACKWARD: [30, 5]
+          TOP: [30, 5]
+          BOTTOM: [30, 5]
+      5:
+        name: Repeating Command Block (Not Conditional, East)
+        tex_direction:
+          FORWARD: [30, 5]
+          RIGHT: [22, 1]
+          BACKWARD: [28, 5]
+          TOP: [28, 5]
+          BOTTOM: [28, 5]
+      8:
+        name: Repeating Command Block (Conditional, Down)
+        tex_direction:
+          FORWARD: [25, 5]
+          SIDES: [25, 5]
+          BACKWARD: [25, 5]
+          BOTTOM: [22, 1]
+      9:
+        name: Repeating Command Block (Conditional, Up)
+        tex_direction:
+          FORWARD: [23, 5]
+          SIDES: [23, 5]
+          BACKWARD: [23, 5]
+          TOP: [22, 1]
+      10:
+        name: Repeating Command Block (Conditional, North)
+        tex_direction:
+          FORWARD: [22, 1]
+          LEFT: [26, 5]
+          RIGHT: [24, 5]
+          TOP: [23, 5]
+          BOTTOM: [23, 5]
+      11:
+        name: Repeating Command Block (Conditional, South)
+        tex_direction:
+          LEFT: [24, 5]
+          RIGHT: [26, 5]
+          BACKWARD: [22, 1]
+          TOP: [25, 5]
+          BOTTOM: [25, 5]
+      12:
+        name: Repeating Command Block (Conditional, West)
+        tex_direction:
+          FORWARD: [24, 5]
+          LEFT: [22, 1]
+          BACKWARD: [26, 5]
+          TOP: [26, 5]
+          BOTTOM: [26, 5]
+      13:
+        name: Repeating Command Block (Conditional, East)
+        tex_direction:
+          FORWARD: [26, 5]
+          RIGHT: [22, 1]
+          BACKWARD: [24, 5]
+          TOP: [24, 5]
+          BOTTOM: [24, 5]
+
+  - id: 211
+    idStr: chain_command_block
+    name: Chain Command Block
+    mapcolor: [200, 200, 200]
+    tex: [22, 5]
+    data:
+      0:
+        name: Chain Command Block (Not Conditional, Down)
+        tex_direction:
+          FORWARD: [29, 6]
+          SIDES: [29, 6]
+          BACKWARD: [29, 6]
+          BOTTOM: [22, 2]
+      1:
+        name: Chain Command Block (Not Conditional, Up)
+        tex_direction:
+          FORWARD: [27, 6]
+          SIDES: [27, 6]
+          BACKWARD: [27, 6]
+          TOP: [22, 2]
+      2:
+        name: Chain Command Block (Not Conditional, North)
+        tex_direction:
+          FORWARD: [22, 2]
+          LEFT: [30, 6]
+          RIGHT: [28, 6]
+          TOP: [27, 6]
+          BOTTOM: [27, 6]
+      3:
+        name: Chain Command Block (Not Conditional, South)
+        tex_direction:
+          LEFT: [28, 6]
+          RIGHT: [30, 6]
+          BACKWARD: [22, 2]
+          TOP: [29, 6]
+          BOTTOM: [29, 6]
+      4:
+        name: Chain Command Block (Not Conditional, West)
+        tex_direction:
+          FORWARD: [28, 6]
+          LEFT: [22, 2]
+          BACKWARD: [30, 6]
+          TOP: [30, 6]
+          BOTTOM: [30, 6]
+      5:
+        name: Chain Command Block (Not Conditional, East)
+        tex_direction:
+          FORWARD: [30, 6]
+          RIGHT: [22, 2]
+          BACKWARD: [28, 6]
+          TOP: [28, 6]
+          BOTTOM: [28, 6]
+      8:
+        name: Chain Command Block (Conditional, Down)
+        tex_direction:
+          FORWARD: [25, 6]
+          SIDES: [25, 6]
+          BACKWARD: [25, 6]
+          BOTTOM: [22, 2]
+      9:
+        name: Chain Command Block (Conditional, Up)
+        tex_direction:
+          FORWARD: [23, 6]
+          SIDES: [23, 6]
+          BACKWARD: [23, 6]
+          TOP: [22, 2]
+      10:
+        name: Chain Command Block (Conditional, North)
+        tex_direction:
+          FORWARD: [22, 2]
+          LEFT: [26, 6]
+          RIGHT: [24, 6]
+          TOP: [23, 6]
+          BOTTOM: [23, 6]
+      11:
+        name: Chain Command Block (Conditional, South)
+        tex_direction:
+          LEFT: [24, 6]
+          RIGHT: [26, 6]
+          BACKWARD: [22, 2]
+          TOP: [25, 6]
+          BOTTOM: [25, 6]
+      12:
+        name: Chain Command Block (Conditional, West)
+        tex_direction:
+          FORWARD: [24, 6]
+          LEFT: [22, 2]
+          BACKWARD: [26, 6]
+          TOP: [26, 6]
+          BOTTOM: [26, 6]
+      13:
+        name: Chain Command Block (Conditional, East)
+        tex_direction:
+          FORWARD: [26, 6]
+          RIGHT: [22, 2]
+          BACKWARD: [24, 6]
+          TOP: [24, 6]
+          BOTTOM: [24, 6]
+        
+  - id: 212
+    idStr: frosted_ice
+    name: Frosted Ice
+    tex: [19, 16]
+    data:
+      0:
+        name: Frosted Ice
+      1:
+        name: Frosted Ice (Stage 1 Cracks)
+      2:
+        name: Frosted Ice (Stage 2 Cracks)
+      3:
+        name: Frosted Ice (Stage 3 Cracks)
+        
+  - id: 213
+    idStr: magma_block
+    name: Magma Block
+    tex: [18, 13]
+    
+  - id: 214
+    idStr: nether_wart_block
+    name: Nether Wart Block
+    tex: [18, 14]
+    
+  - id: 215
+    idStr: red_nether_brick
+    name: Red Nether Brick
+    tex: [18, 15]
+    
+  - id: 216
+    idStr: bone_block
+    name: Bone Block
+    data:
+      0:
+        name: Bone Block (Upright)
+        tex_direction:
+          TOP: [19, 11]
+          BOTTOM: [19, 11]
+          SIDES: [19, 12]
+          FORWARD: [19, 12]
+          BACKWARD: [19, 12]
+      4:
+        name: Bone Block (East/West)
+        tex_direction:
+          TOP: [19, 12]
+          BOTTOM: [19, 12]
+          SIDES: [19, 11]
+          FORWARD: [19, 12]
+          BACKWARD: [19, 12]
+      8:
+        name: Bone Block (North/South)
+        tex_direction:
+          TOP: [19, 12]
+          BOTTOM: [19, 12]
+          SIDES: [19, 12]
+          FORWARD: [19, 11]
+          BACKWARD: [19, 11]
+          
+  - id: 217
+    idStr: structure_void
+    name: Structure Void
+    opacity: 0
+    type: GLASS
+    tex: [19, 13]
+        
+  - id: 255
+    idStr: structure_block
+    name: Structure Block
+    data:
+      0:
+        name: Structure Block (Save)
+        tex: [19, 10]
+      1:
+        name: Structure Block (Load)
+        tex: [20, 10]
+      2:
+        name: Structure Block (Corner)
+        tex: [20, 9]
+      3:
+        name: Structure Block (Data)
+        tex: [19, 9]
+    

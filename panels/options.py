@@ -2,7 +2,7 @@ import albow
 from albow.dialogs import Dialog
 from config import config
 import pygame
-from albow.translate import _
+from albow.translate import _, buildTemplate
 import sys
 import os
 import logging
@@ -26,29 +26,30 @@ class OptionsPanel(Dialog):
         self.saveOldPortable = self.portableVar.get()
 
         self.saveOldConfig = {
-            config.controls.autobrake:                 config.controls.autobrake.get(),
-            config.controls.swapAxes:                  config.controls.swapAxes.get(),
-            config.controls.cameraAccel:               config.controls.cameraAccel.get(),
-            config.controls.cameraDrag:                config.controls.cameraDrag.get(),
-            config.controls.cameraMaxSpeed:            config.controls.cameraMaxSpeed.get(),
-            config.controls.cameraBrakingSpeed:        config.controls.cameraBrakingSpeed.get(),
-            config.controls.mouseSpeed:                config.controls.mouseSpeed.get(),
-            config.settings.undoLimit:                 config.settings.undoLimit.get(),
-            config.settings.maxCopies:                 config.settings.maxCopies.get(),
-            config.controls.invertMousePitch:          config.controls.invertMousePitch.get(),
-            config.settings.spaceHeight:               config.settings.spaceHeight.get(),
-            albow.AttrRef(self, 'blockBuffer'):        albow.AttrRef(self, 'blockBuffer').get(),
-            config.settings.setWindowPlacement:        config.settings.setWindowPlacement.get(),
-            config.settings.rotateBlockBrush:          config.settings.rotateBlockBrush.get(),
-            config.settings.shouldResizeAlert:         config.settings.shouldResizeAlert.get(),
-            config.settings.superSecretSettings:       config.settings.superSecretSettings.get(),
-            config.settings.longDistanceMode:          config.settings.longDistanceMode.get(),
-            config.settings.flyMode:                   config.settings.flyMode.get(),
-            config.settings.langCode:                  config.settings.langCode.get(),
-            config.settings.compassToggle:             config.settings.compassToggle.get(),
-            config.settings.compassSize:               config.settings.compassSize.get(),
-            config.settings.fontProportion:            config.settings.fontProportion.get(),
-            config.settings.fogIntensity:              config.settings.fogIntensity.get(),
+            config.controls.autobrake:                        config.controls.autobrake.get(),
+            config.controls.swapAxes:                         config.controls.swapAxes.get(),
+            config.controls.cameraAccel:                      config.controls.cameraAccel.get(),
+            config.controls.cameraDrag:                       config.controls.cameraDrag.get(),
+            config.controls.cameraMaxSpeed:                   config.controls.cameraMaxSpeed.get(),
+            config.controls.cameraBrakingSpeed:               config.controls.cameraBrakingSpeed.get(),
+            config.controls.mouseSpeed:                       config.controls.mouseSpeed.get(),
+            config.settings.undoLimit:                        config.settings.undoLimit.get(),
+            config.settings.maxCopies:                        config.settings.maxCopies.get(),
+            config.controls.invertMousePitch:                 config.controls.invertMousePitch.get(),
+            config.settings.spaceHeight:                      config.settings.spaceHeight.get(),
+            albow.AttrRef(self, 'blockBuffer'):               albow.AttrRef(self, 'blockBuffer').get(),
+            config.settings.setWindowPlacement:               config.settings.setWindowPlacement.get(),
+            config.settings.rotateBlockBrush:                 config.settings.rotateBlockBrush.get(),
+            config.settings.shouldResizeAlert:                config.settings.shouldResizeAlert.get(),
+            config.settings.superSecretSettings:              config.settings.superSecretSettings.get(),
+            config.settings.longDistanceMode:                 config.settings.longDistanceMode.get(),
+            config.settings.flyMode:                          config.settings.flyMode.get(),
+            config.settings.langCode:                         config.settings.langCode.get(),
+            config.settings.compassToggle:                    config.settings.compassToggle.get(),
+            config.settings.compassSize:                      config.settings.compassSize.get(),
+            config.settings.fontProportion:                   config.settings.fontProportion.get(),
+            config.settings.fogIntensity:                     config.settings.fogIntensity.get(),
+            config.schematicCopying.cancelCommandBlockOffset: config.schematicCopying.cancelCommandBlockOffset.get()
         }
         global old_lang
         if old_lang == None:
@@ -140,6 +141,14 @@ class OptionsPanel(Dialog):
         flyModeRow = albow.CheckBoxLabel("Fly Mode",
                                             ref=config.settings.flyMode,
                                             tooltipText="Moving forward and Backward will not change your altitude in Fly Mode.")
+        
+        showCommandsRow = albow.CheckBoxLabel("Show Commands",
+                                              ref=config.settings.showCommands,
+                                              tooltipText="Show the command in a Command Block when hovering over it.")
+
+        cancelCommandBlockOffset = albow.CheckBoxLabel("Cancel Command Block Offset",
+                                                       ref=config.schematicCopying.cancelCommandBlockOffset,
+                                                       tooltipText="Cancels the command blocks coords changed when copied.")
 
         lng = config.settings.langCode.get()
 
@@ -147,7 +156,7 @@ class OptionsPanel(Dialog):
 
         langNames = [k for k, v in langs]
 
-        self.languageButton = albow.ChoiceButton(langNames, choose=self.changeLanguage)
+        self.languageButton = albow.ChoiceButton(langNames, choose=self.changeLanguage, doNotTranslate=True)
         if self.sgnal[lng] in self.languageButton.choices:
             self.languageButton.selectedChoice = self.sgnal[lng]
 
@@ -189,6 +198,8 @@ class OptionsPanel(Dialog):
                     superSecretSettingsRow,
                     rotateBlockBrushRow,
                     compassToggleRow,
+                    showCommandsRow,
+                    cancelCommandBlockOffset,
                     langButtonRow,
                     ) + (
                         ((sys.platform == "win32" and pygame.version.vernum == (1, 9, 1)) and (windowSizeRow,) or ())
@@ -243,6 +254,9 @@ class OptionsPanel(Dialog):
         return langs
 
     def changeLanguage(self):
+        if albow.translate.buildTemplate:
+            self.languageButton.selectedChoice = 'English (US)'
+            return
         langName = self.languageButton.selectedChoice
         if langName not in self.langs:
             lng = "en_US"
@@ -253,13 +267,13 @@ class OptionsPanel(Dialog):
         logging.debug('*** Language change detected.')
         logging.debug('    Former language: %s.'%albow.translate.getLang())
         logging.debug('    New language: %s.'%lng)
-        albow.translate.langPath = os.sep.join((".", "lang"))
+        albow.translate.langPath = os.sep.join((directories.getDataDir(), "lang"))
         update = albow.translate.setLang(lng)[2]
         logging.debug('    Update done? %s (Magic %s)'%(update, update or lng == 'en_US'))
-        self.mcedit.root.set_update_translation(update or lng == 'en_US')
-        self.mcedit.root.set_update_translation(False)
-        self.mcedit.editor.set_update_translation(update or lng == 'en_US')
-        self.mcedit.editor.set_update_translation(False)
+        self.mcedit.root.set_update_ui(update or lng == 'en_US')
+        self.mcedit.root.set_update_ui(False)
+        self.mcedit.editor.set_update_ui(update or lng == 'en_US')
+        self.mcedit.editor.set_update_ui(False)
         #-#
 
     @staticmethod
@@ -285,11 +299,20 @@ class OptionsPanel(Dialog):
                 (sys.platform == "darwin" and _("the MCEdit application") or _("MCEditData"))),
             _("This will move your settings and schematics to your Documents folder. Continue?"),
         ]
+        useExisting = False
 
         alertText = textChoices[directories.portable]
         if albow.ask(alertText) == "OK":
+            if [directories.hasPreviousPortableInstallation, directories.hasPreviousFixedInstallation][directories.portable]():
+                asked = albow.ask("Found a previous %s installation"%["portable", "fixed"][directories.portable], responses=["Use", "Overwrite", "Cancel"])
+                if asked == "Use":
+                    useExisting = True
+                elif asked == "Overwrite":
+                    useExisting = False
+                elif asked == "Cancel":
+                    return False
             try:
-                [directories.goPortable, directories.goFixed][directories.portable]()
+                [directories.goPortable, directories.goFixed][directories.portable](useExisting)
             except Exception, e:
                 traceback.print_exc()
                 albow.alert(_(u"Error while moving files: {0}").format(repr(e)))
@@ -300,28 +323,14 @@ class OptionsPanel(Dialog):
         return True
 
     def dismiss(self, *args, **kwargs):
-        """Used to change the language and the font proportion"""
-        lang = config.settings.langCode.get() == old_lang or config.settings.langCode.get() == self.saveOldConfig[config.settings.langCode]
-        font = config.settings.fontProportion.get() == old_fprop or config.settings.fontProportion.get() == self.saveOldConfig[config.settings.fontProportion]
-        #-# The following lines will be used for the language and font dynamic changes
-        #-# The restart boxes will be suppressed.
-#        lang = config.settings.langCode.get() == self.saveOldConfig[config.settings.langCode]
-#        font = config.settings.fontProportion.get() == self.saveOldConfig[config.settings.fontProportion]
-#        self.changeLanguage()
-
-#        if not font or not lang:
-#            editor = self.mcedit.editor
-#            if editor and editor.unsavedEdits:
-#                result = albow.ask("You must restart MCEdit to see language changes", ["Save and Restart", "Restart", "Later"])
-#            else:
-#                result = albow.ask("You must restart MCEdit to see language changes", ["Restart", "Later"])
-#            if result == "Save and Restart":
-#                editor.saveFile()
-#                self.mcedit.restart()
-#            elif result == "Restart":
-#                self.mcedit.restart()
-#            elif result == "Later":
-#                pass
+        """Used to change the font proportion."""
+        # If font proportion setting has changed, update the UI.
+        if config.settings.fontProportion.get() != self.saveOldConfig[config.settings.fontProportion]:
+            albow.resource.reload_fonts(proportion=config.settings.fontProportion.get())
+            self.mcedit.root.set_update_ui(True)
+            self.mcedit.root.set_update_ui(False)
+            self.mcedit.editor.set_update_ui(True)
+            self.mcedit.editor.set_update_ui(False)
 
         self.reshowNumberFields()
         for key in self.saveOldConfig.keys():

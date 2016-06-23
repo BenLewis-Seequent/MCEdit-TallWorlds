@@ -62,7 +62,7 @@ class CoordsInput(Widget):
             field.change_action = self._coordsChanged
             field.enter_passes = False
 
-        offsetCol = Column((self.xField, self.yField, self.zField))
+        offsetCol = Column((Row((Label('X'), self.xField)), Row((Label('Y'), self.yField)), Row((Label('Z'), self.zField))))
 
         nudgeOffsetRow = Row((offsetCol, self.nudgeButton))
 
@@ -234,7 +234,7 @@ class CloneToolPanel(Panel):
         return not isinstance(self.tool.level, pymclevel.MCInfdevOldLevel)
 
     def __init__(self, tool, editor, _parent=None):
-        Panel.__init__(self)
+        Panel.__init__(self, name='Panel.CloneToolPanel')
         self.tool = tool
 
         rotaterollRow = Row((
@@ -381,7 +381,7 @@ class CloneToolPanel(Panel):
 
 class CloneToolOptions(ToolOptions):
     def __init__(self, tool):
-        Panel.__init__(self)
+        ToolOptions.__init__(self, name='Panel.CloneToolOptions')
         self.tool = tool
         self.autoPlaceCheckBox = CheckBox(ref=AttrRef(tool, "placeImmediately"))
         self.autoPlaceLabel = Label("Place Immediately")
@@ -726,7 +726,7 @@ class CloneTool(EditorTool):
         if y < 0:
             y = 0
 
-        if not isinstance(lev, pymclevel.MCInfdevOldLevel):
+        if not lev.Width == 0 and lev.Length == 0:
             sx = size[0]
             if x + sx > lev.Width:
                 x = lev.Width - sx
@@ -878,9 +878,9 @@ class CloneTool(EditorTool):
         if self.canRotateLevel:
             for i in range(amount & 0x1):
                 if blocksOnly:
-                    self.level.flipVertical()
-                else:
                     self.level.flipVerticalBlocks()
+                else:
+                    self.level.flipVertical()
             self.previewRenderer.level = self.level
 
     @alertException
@@ -983,6 +983,7 @@ class CloneTool(EditorTool):
     def mouseUp(self, evt, pos, direction):
         if self.draggingFace is not None:
             self.destPoint = self.draggingOrigin()
+            self.updateOffsets()
 
         self.draggingFace = None
         self.draggingStartPoint = None
@@ -1110,7 +1111,7 @@ class ConstructionToolPanel(CloneToolPanel):
 
 class ConstructionToolOptions(ToolOptions):
     def __init__(self, tool):
-        Panel.__init__(self)
+        ToolOptions.__init__(self, name='Panel.ConstructionToolOptions')
         self.tool = tool
 
         importNudgeLabel = Label("Import Fast Nudge Settings:")
@@ -1213,16 +1214,16 @@ class ConstructionTool(CloneTool):
 
         self.editor.mouseLookOff()
 
-        clipFilename = mcplatform.askOpenFile(title='Import a schematic or level...', schematics=True, suffixes=["bo2"])
+        clipFilename = mcplatform.askOpenFile(title='Import a schematic or level...', schematics=True)
         # xxx mouthful
         if clipFilename:
-            if str(clipFilename).split(".")[-1] in ("schematic", "schematic.gz", "zip", "inv"):
+            if unicode(clipFilename).split(".")[-1] in ("schematic", "schematic.gz", "zip", "inv"):
                 self.loadSchematic(clipFilename)
-            elif str(clipFilename).split(".")[-1].lower() == "bo2":
+            elif unicode(clipFilename).split(".")[-1].lower() == "bo2":
                 self.loadLevel(BOParser.BO2(clipFilename).getSchematic())
-            elif str(clipFilename).split(".")[-1].lower() == "bo3":
-                #self.loadLevel(BOParser.BO3(clipFilename).getSchematic())
-                alert("BO3 support is currently not available")
+            elif unicode(clipFilename).split(".")[-1].lower() == "bo3":
+                self.loadLevel(BOParser.BO3(clipFilename).getSchematic())
+#                alert("BO3 support is currently not available")
             else:
                 self.loadSchematic(clipFilename)
 

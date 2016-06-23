@@ -12,7 +12,8 @@ ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
 WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
 ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE."""
-
+import time
+t= time.time()
 import sys
 import os
 import json
@@ -63,29 +64,52 @@ def win32_utf8_argv():
                     xrange(0, argc.value)]
     except Exception:
         pass
-
-
-def getDataDir():
-    """Returns the folder where the executable is located."""
-    if sys.platform == "win32":
-        def fsdecode(x):
-            return x.decode(sys.getfilesystemencoding())
-
-        argzero = fsdecode(os.path.abspath(sys.argv[0]))
-        dataDir = os.getcwdu()
-        '''
-        if getattr(sys, 'frozen', False):
-            dataDir = os.path.dirname(sys._MEIPASS)
-        else:
-            dataDir = os.path.dirname(__file__)
-        '''
-            #dataDir = str(os.path.sep).join(dataDir.split(os.path.sep)[:-1])
-            
-    else:
-        dataDir = os.getcwdu()
-
+    
+def getNewDataDir(path=""):
+    '''
+    Returns the directory where the executable is located (This function is only ran on Windows OS's)
+    
+    :param path: Additional directories/files to join to the data directory path
+    
+    :return unicode
+    '''
+    dataDir = os.path.dirname(os.path.abspath(__file__))
+    #print "Dynamic: " + str(os.getcwdu())
+    #print "Fixed: " + str(dataDir) 
+    if len(path) > 0:
+        return os.path.join(dataDir, path)
     return dataDir
 
+getNewDataDir()
+
+def getDataDir(path=""):
+    '''
+    Returns the folder where the executable is located. (This function is ran on non-Windows OS's)
+    
+    :param path: Additional directories/files to join to the data directory path
+    
+    :return unicode
+    '''
+    # if sys.platform == "win32":
+    #     def fsdecode(x):
+    #         return x.decode(sys.getfilesystemencoding())
+    #
+    #     dataDir = os.getcwdu()
+    #     '''
+    #     if getattr(sys, 'frozen', False):
+    #         dataDir = os.path.dirname(sys._MEIPASS)
+    #     else:
+    #         dataDir = os.path.dirname(__file__)
+    #     '''
+    #
+    # else:
+    dataDir = os.getcwdu()
+    if len(path) > 0:
+        return os.path.join(dataDir, path)
+    return dataDir
+
+if sys.platform == "win32":
+    getDataDir = getNewDataDir
 
 def win32_appdata():
     # try to use win32 api to get the AppData folder since python doesn't populate os.environ with unicode strings.
@@ -171,16 +195,25 @@ def getDocumentsFolder():
 
 
 def getSelectedProfile():
-    '''
+    """
     Gets the selected profile from the Minecraft Launcher
-    '''
+    """
     try:
         selectedProfile = getMinecraftProfileJSON()['selectedProfile']
         return selectedProfile
     except:
         return None
 
-minecraftSaveFileDir = os.path.join(getMinecraftProfileDirectory(getSelectedProfile()), "saves")
+_minecraftSaveFileDir = None
+
+def getMinecraftSaveFileDir():
+    global _minecraftSaveFileDir
+    if _minecraftSaveFileDir is None:
+        _minecraftSaveFileDir = os.path.join(getMinecraftProfileDirectory(getSelectedProfile()), "saves")
+    return _minecraftSaveFileDir
+
+minecraftSaveFileDir = getMinecraftSaveFileDir()
+
 ini = u"mcedit.ini"
 cache = u"usercache.json"
 
@@ -208,33 +241,50 @@ if sys.platform != "darwin":
     fixedFiltersDir = os.path.join(docsFolder, u"Filters")
     if not os.path.exists(docsFolder):
         os.makedirs(docsFolder)
+        
+def hasPreviousPortableInstallation():
+    portableDirectoriesFound = (os.path.exists(portableConfigFilePath) or os.path.exists(portableCacheFilePath) or
+            os.path.exists(portableGenericSupportPath) or os.path.exists(portableSchematicsDir) or
+            os.path.exists(portableBrushesDir) or os.path.exists(portableJarStorageDir) or
+            os.path.exists(portableFiltersDir))
+    return portableDirectoriesFound
 
-    sys.path.append(fixedFiltersDir)
-    sys.path.append(portableFiltersDir)
+def hasPreviousFixedInstallation():
+    fixedDirectoriesFound = (os.path.exists(fixedConfigFilePath) or os.path.exists(fixedCacheFilePath) or
+            os.path.exists(fixedGenericSupportPath) or os.path.exists(fixedSchematicsDir) or
+            os.path.exists(fixedBrushesDir) or os.path.exists(fixedJarStorageDir) or
+            os.path.exists(fixedFiltersDir))
+    return fixedDirectoriesFound
 
-
-def goPortable():
+def goPortable(useExisting):
     if sys.platform == "darwin":
         return False
     global configFilePath, schematicsDir, filtersDir, portable, brushesDir
+    
+    if not useExisting:
+        if os.path.exists(fixedSchematicsDir):
+            move_displace(fixedSchematicsDir, portableSchematicsDir)
+        if os.path.exists(fixedBrushesDir):
+            move_displace(fixedBrushesDir, portableBrushesDir)
+        if os.path.exists(fixedConfigFilePath):
+            move_displace(fixedConfigFilePath, portableConfigFilePath)
+        if os.path.exists(fixedFiltersDir):
+            move_displace(fixedFiltersDir, portableFiltersDir)
+        if os.path.exists(fixedCacheFilePath):
+            move_displace(fixedCacheFilePath, portableCacheFilePath)
+        if os.path.exists(fixedJarStorageDir):
+            move_displace(fixedJarStorageDir, portableJarStorageDir)
 
-    if os.path.exists(fixedSchematicsDir):
-        move_displace(fixedSchematicsDir, portableSchematicsDir)
-    if os.path.exists(fixedBrushesDir):
-        move_displace(fixedBrushesDir, portableBrushesDir)
-    if os.path.exists(fixedConfigFilePath):
-        move_displace(fixedConfigFilePath, portableConfigFilePath)
-    if os.path.exists(fixedFiltersDir):
-        move_displace(fixedFiltersDir, portableFiltersDir)
-    if os.path.exists(fixedCacheFilePath):
-        move_displace(fixedCacheFilePath, portableCacheFilePath)
-    if os.path.exists(fixedJarStorageDir):
-        move_displace(fixedJarStorageDir, portableJarStorageDir)
+    if filtersDir in sys.path:
+        sys.path.remove(filtersDir)
 
     schematicsDir = portableSchematicsDir
     brushesDir = portableBrushesDir
     configFilePath = portableConfigFilePath
     filtersDir = portableFiltersDir
+
+    sys.path.append(filtersDir)
+
     portable = True
     return True
 
@@ -257,29 +307,35 @@ def move_displace(src, dst):
         shutil.move(src, dst)
     return True
 
-
-def goFixed():
+def goFixed(useExisting):
     if sys.platform == "darwin":
         return False
     global configFilePath, schematicsDir, filtersDir, portable, cacheDir, brushesDir
+    
+    if not useExisting:
+        if os.path.exists(portableSchematicsDir):
+            move_displace(portableSchematicsDir, fixedSchematicsDir)
+        if os.path.exists(portableBrushesDir):
+            move_displace(portableBrushesDir, fixedBrushesDir)
+        if os.path.exists(portableConfigFilePath):
+            move_displace(portableConfigFilePath, fixedConfigFilePath)
+        if os.path.exists(portableFiltersDir):
+            move_displace(portableFiltersDir, fixedFiltersDir)
+        if os.path.exists(portableCacheFilePath):
+            move_displace(portableCacheFilePath, fixedCacheFilePath)
+        if os.path.exists(portableJarStorageDir):
+            move_displace(portableJarStorageDir, fixedJarStorageDir)
 
-    if os.path.exists(portableSchematicsDir):
-        move_displace(portableSchematicsDir, fixedSchematicsDir)
-    if os.path.exists(portableBrushesDir):
-        move_displace(portableBrushesDir, fixedBrushesDir)
-    if os.path.exists(portableConfigFilePath):
-        move_displace(portableConfigFilePath, fixedConfigFilePath)
-    if os.path.exists(portableFiltersDir):
-        move_displace(portableFiltersDir, fixedFiltersDir)
-    if os.path.exists(portableCacheFilePath):
-        move_displace(portableCacheFilePath, fixedCacheFilePath)
-    if os.path.exists(portableJarStorageDir):
-        move_displace(portableJarStorageDir, fixedJarStorageDir)
+    if filtersDir in sys.path:
+        sys.path.remove(filtersDir)
 
     schematicsDir = fixedSchematicsDir
     brushesDir = fixedBrushesDir
     configFilePath = fixedConfigFilePath
     filtersDir = fixedFiltersDir
+
+    sys.path.append(filtersDir)
+
     portable = False
 
 
@@ -292,7 +348,8 @@ def fixedConfigExists():
 
 if fixedConfigExists():
     print "Running in fixed mode. Support files are in your " + (
-    sys.platform == "darwin" and "App Support Folder (Available from the main menu of MCEdit)" or "Documents folder.")
+        sys.platform == "darwin" and "App Support Folder (Available from the main menu of MCEdit)"
+        or "Documents folder.")
     portable = False
     if not sys.platform == "darwin":
         schematicsDir = fixedSchematicsDir
@@ -331,7 +388,11 @@ def getAllOfAFile(file_dir, ext):
 
 
 def getCacheDir():
-    """Returns the path to the cache folder. This folder is the Application Support folder on OS X, and the Documents Folder on Windows."""
+    """
+    Returns the path to the cache folder.
+    This folder is the Application Support folder on OS X, and the Documents Folder on Windows.
+    :return unicode
+    """
     if sys.platform == "win32":
         return genericSupportDir
     elif sys.platform == "darwin":
@@ -353,6 +414,15 @@ if sys.platform == "darwin":
 # Create pymclevel folder as needed
 if not os.path.exists(getCacheDir()):
     os.makedirs(getCacheDir())
+
+# build the structures of directories if they don't exists
+for directory in (filtersDir, brushesDir, schematicsDir):
+    if not os.path.exists(directory):
+        os.makedirs(directory)
+
+bundledLibsDir = os.path.join(filtersDir, 'lib', 'Bundled Libraries')
+if not os.path.exists(bundledLibsDir):
+    os.makedirs(bundledLibsDir)
 
 # set userCachePath
 userCachePath = os.path.join(getCacheDir(),'usercache.json')

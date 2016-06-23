@@ -8,11 +8,14 @@ then
 elif [ -f "mcedit.pyc" ]
 then
     f="mcedit.pyc"
+elif [ -f "mcedit" ]
+then
+    f="mcedit"
 else
     echo "MCEdit program not found."
     echo "Check your installation and retry."
     exit 1
 fi
-python2 $f $@
+python2 $f "${@}"
 read -n 1 -p "Press any key to close."
 echo ""

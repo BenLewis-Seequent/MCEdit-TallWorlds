@@ -33,14 +33,14 @@ sound_cache = {}
 text_cache = {}
 cursor_cache = {}
 
-font_proportion = 100 # %
+font_proportion = 100  # %
 gtbdr = True
 
 
 def _resource_path(default_prefix, names, prefix=""):
     path = os.path.join(resource_dir, prefix or default_prefix, *names)
-    if type(path) == unicode:
-        path = path.encode(sys.getfilesystemencoding())
+    # if type(path) == unicode:
+    #     path = path.encode(sys.getfilesystemencoding())
     return path
 
 
@@ -57,7 +57,7 @@ def _get_image(names, border=0, optimize=optimize_images, noalpha=False,
     path = _resource_path(prefix, names)
     image = image_cache.get(path)
     if not image:
-        image = pygame.image.load(path)
+        image = pygame.image.load(open(path, 'rb'))
         if noalpha:
             image = image.convert(24)
         elif optimize:
@@ -130,40 +130,84 @@ def _2478aq_heot(aqz):
         else:
             gtbdr = False 
 
+# Note by Rubisk (26/6/2015)
+# Pygame can't handle unicode filenames, so we have to pass
+# a file object instead. However, pygame doesn't hold a reference
+# to the file object. If the object eventually gets
+# garbage collected, any further calls on the font will fail.
+# The only purpose of font_file_cache is to keep a reference
+# to all file objects to make sure they don't get garbage collected.
+# Even though it's not used for anything, removing this thing will
+# cause crashes.
+font_file_cache = {}
+
 def get_font(size, *names, **kwds):
     global font_cache
+#     print names, font_lang_cache
     lngs_fontNm = font_lang_cache.get(names[-1], {})
+#     print getCurLang(), lngs_fontNm
     fontNm = lngs_fontNm.get(getCurLang(), None)
+#     print fontNm
     if fontNm:
         names = [a for a in names[:-1]]
         names.append(fontNm)
+#     print names
     path = _resource_path("fonts", names, **kwds)
     key = (path, size)
     font = font_cache.get(key)
     if not font:
-        oSize = 0 + size
-        size = float(size * 1000)
-        size = size / float(100)
-        size = int(size * font_proportion / 1000)
-        try:
-            font = pygame.font.Font(path, size)
-            log.debug("Font %s loaded."%path)
-            log.debug("    Original size: %s. Proportion: %s. Final size: %s."%(oSize, font_proportion, size))
-        except Exception, e:
-            log.debug("PyGame could not load font.")
-            log.debug("Exception: %s"%e)
-            log.debug("Trying with sys.getfilesystemencoding()")
+        if not os.path.exists(path):
+            log.warn("Could not find font file %s."%names)
+            log.warn("Verify the name and the resource.")
+            font = pygame.font.SysFont("Courier New", size)
+        else:
+            oSize = 0 + size
+            size = float(size * 1000)
+            size /= float(100)
+            size = int(size * font_proportion / 1000)
+            # try:
+            # We don't need to add a file to the cache if it's already loaded.
+            if path not in font_file_cache.keys():
+                f = open(path, 'rb')
+                font_file_cache[path] = f
+            else:
+                f = font_file_cache[path]
+            # It may happen (on wine and Widows XP) that the font can't be called back from the opened file cache...
             try:
-                path = path.encode(sys.getfilesystemencoding())
+                font = pygame.font.Font(f, size)
+            except:
                 font = pygame.font.Font(path, size)
-                log.debug("Font %s loaded."%path)
-            except Exception, e:
-                log.debug("PyGame could not load font.")
-                log.debug("Exception: %s"%e)
-                log.debug("Loading sysfont")
-                font = pygame.font.SysFont("Courier New", size)
-        font_cache[key] = font
+            log.debug("Font %s loaded." % path)
+            log.debug("    Original size: %s. Proportion: %s. Final size: %s." % (oSize, font_proportion, size))
+            # except:
+            #     # log.debug("PyGame could not load font.")
+            #     # log.debug("Exception: %s"%e)
+            #     # log.debug("Trying with sys.getfilesystemencoding()")
+            #     # try:
+            #     #     path = path.encode(sys.getfilesystemencoding())
+            #     #     font = pygame.font.Font(open(path, 'rb'), size)
+            #     #     log.debug("Font %s loaded."%path)
+            #     # except Exception, e:
+            #     #     log.debug("PyGame could not load font.")
+            #     #     log.debug("Exception: %s"%e)
+            #     #     log.debug("Loading sysfont")
+            #     font = pygame.font.SysFont("Courier New", size)
+    font_cache[key] = font
     return font
+
+def reload_fonts(proportion=font_proportion):
+    """Reload the fonts defined in font_cache. Used to update the font sizes withpout restarting the application."""
+    log.debug("Reloading fonts.")
+    global font_cache
+    global font_proportion
+    if proportion != font_proportion:
+        font_proportion = proportion
+    keys = [(os.path.split(a)[-1], b) for a, b in font_cache.keys()]
+    font_cache = {}
+    while keys:
+        name, size = keys.pop()
+        get_font(size, name)
+    log.debug("Fonts reloaded.")
 
 
 class DummySound(object):

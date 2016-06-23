@@ -1,3 +1,5 @@
+# -*- coding: utf_8 -*-
+# The above line is necessary, unless we want problems with encodings...
 import sys
 from compass import CompassOverlay
 from raycaster import TooFarException
@@ -23,27 +25,58 @@ from OpenGL import GL
 from OpenGL import GLU
 
 from albow import alert, AttrRef, Button, Column, input_text, Row, TableColumn, TableView, Widget, CheckBox, \
-    TextFieldWrapped, MenuButton, ChoiceButton, IntInputRow, TextInputRow, showProgress
+    TextFieldWrapped, MenuButton, ChoiceButton, IntInputRow, TextInputRow, showProgress, IntField, ask
 from albow.controls import Label, ValueDisplay
 from albow.dialogs import Dialog, wrapped_label
 from albow.openglwidgets import GLViewport
+from albow.extended_widgets import BasicTextInputRow, CheckBoxLabel
 from albow.translate import _
 from pygame import mouse
-
 from depths import DepthOffset
 from editortools.operation import Operation
 from glutils import gl
+from pymclevel.nbt import TAG_String
+from editortools.nbtexplorer import SlotEditor
 
+class SignEditOperation(Operation):
+        def __init__(self, tool, level, tileEntity, backupTileEntity):
+            self.tool = tool
+            self.level = level
+            self.tileEntity = tileEntity
+            self.undoBackupEntityTag = backupTileEntity
+            self.canUndo = False
+
+        def perform(self, recordUndo=True):
+            if self.level.saving:
+                alert("Cannot perform action while saving is taking place")
+                return
+            self.level.addTileEntity(self.tileEntity)
+            self.canUndo = True
+
+        def undo(self):
+            self.redoBackupEntityTag = copy.deepcopy(self.tileEntity)
+            self.level.addTileEntity(self.undoBackupEntityTag)
+            return pymclevel.BoundingBox(pymclevel.TileEntity.pos(self.tileEntity), (1, 1, 1))
+
+        def redo(self):
+            self.level.addTileEntity(self.redoBackupEntityTag)
+            return pymclevel.BoundingBox(pymclevel.TileEntity.pos(self.tileEntity), (1, 1, 1))
 
 class CameraViewport(GLViewport):
     anchor = "tlbr"
 
     oldMousePosition = None
+    dontShowMessageAgain = False
 
-    def __init__(self, editor):
+    def __init__(self, editor, def_enc=None):
         self.editor = editor
+        global DEF_ENC
+        DEF_ENC = def_enc or editor.mcedit.def_enc
         rect = editor.mcedit.rect
         GLViewport.__init__(self, rect)
+
+        # Declare a pseudo showCommands function, since it is called by other objects before its creation in mouse_move.
+        self.showCommands = lambda:None
 
         near = 0.5
         far = 4000.0
@@ -86,6 +119,7 @@ class CameraViewport(GLViewport):
         self.mouseVector = (0, 0, 0)
 
         self.root = self.get_root()
+        self.hoveringCommandBlock = [False, ""]
         # self.add(DebugDisplay(self, "cameraPosition", "blockFaceUnderCursor", "mouseVector", "mouse3dPoint"))
 
     @property
@@ -138,9 +172,10 @@ class CameraViewport(GLViewport):
         else:
             max_speed = self.maxSpeed
 
-        if inSpace:
+        if inSpace or self.root.sprint:
             accel_factor *= 3.0
             max_speed *= 3.0
+            self.root.sprint = False
         elif config.settings.viewMode.get() == "Chunk":
             accel_factor *= 2.0
             max_speed *= 2.0
@@ -227,7 +262,7 @@ class CameraViewport(GLViewport):
     def setModelview(self):
         pos = self.cameraPosition
         look = numpy.array(self.cameraPosition)
-        look += self.cameraVector
+        look = look.astype(float) + self.cameraVector
         up = (0, 1, 0)
         GLU.gluLookAt(pos[0], pos[1], pos[2],
                       look[0], look[1], look[2],
@@ -321,11 +356,34 @@ class CameraViewport(GLViewport):
                 else:
                     focusPair = self.blockFaceUnderCursor
 
+            try:
+                if focusPair[0] is not None and self.editor.level.tileEntityAt(*focusPair[0]):
+                    changed = False
+                    te = self.editor.level.tileEntityAt(*focusPair[0])
+                    backupTE = copy.deepcopy(te)
+                    if te["id"].value == "Sign":
+                        if "Text1" in te and "Text2" in te and "Text3" in te and "Text4" in te:
+                            for i in xrange(1,5):
+                                if len(te["Text"+str(i)].value) > 32767:
+                                    te["Text"+str(i)] = pymclevel.TAG_String(str(te["Text"+str(i)].value)[:32767])
+                                    changed = True
+                    if changed:
+                        response = None
+                        if not self.dontShowMessageAgain:
+                            response = ask("Found a sign that exceeded the maximum character limit. Automatically trimmed the sign to prevent crashes.", responses=["Ok", "Don't show this again"])
+                        if response is not None and response == "Don't show this again":
+                            self.dontShowMessageAgain = True
+                        op = SignEditOperation(self.editor, self.editor.level, te, backupTE)
+                        self.editor.addOperation(op)
+                        if op.canUndo:
+                            self.editor.addUnsavedEdit()
+            except:
+                pass
+
             self.blockFaceUnderCursor = focusPair
 
     def _findBlockFaceUnderCursor(self, projectedPoint):
         """Returns a (pos, Face) pair or None if one couldn't be found"""
-
         d = [0, 0, 0]
 
         try:
@@ -485,13 +543,18 @@ class CameraViewport(GLViewport):
             mobs[mobTable.selectedIndex] = id
             panel.dismiss()
 
-        id = tileEntity["EntityId"].value
+        if "EntityId" in tileEntity:
+            id = tileEntity["EntityId"].value
+        elif "SpawnData" in tileEntity:
+            id = tileEntity["SpawnData"]["id"].value
+        else:
+            id = "[Custom]"
         addMob(id)
 
         mobTable.selectedIndex = mobs.index(id)
 
-        oldChoiceCol = Column((Label("Current: " + id, align='l', width=200), ))
-        newChoiceCol = Column((ValueDisplay(width=200, get_value=lambda: "Change to: " + selectedMob()), mobTable))
+        oldChoiceCol = Column((Label(_("Current: ") + id, align='l', width=200), ))
+        newChoiceCol = Column((ValueDisplay(width=200, get_value=lambda: _("Change to: ") + selectedMob()), mobTable))
 
         lastRow = Row((Button("OK", action=panel.dismiss), Button("Cancel", action=cancel)))
         panel.add(Column((oldChoiceCol, newChoiceCol, lastRow)))
@@ -523,6 +586,8 @@ class CameraViewport(GLViewport):
 
         if id != selectedMob():
             tileEntity["EntityId"] = pymclevel.TAG_String(selectedMob())
+            tileEntity["SpawnData"] = pymclevel.TAG_Compound()
+            tileEntity["SpawnData"]["id"] = pymclevel.TAG_String(selectedMob())
             op = MonsterSpawnerEditOperation(self.editor, self.editor.level)
             self.editor.addOperation(op)
             if op.canUndo:
@@ -605,8 +670,8 @@ class CameraViewport(GLViewport):
         else:
             discTable.selectedIndex = discs[id] - 2255
 
-        oldChoiceCol = Column((Label("Current: " + id, align='l', width=200), ))
-        newChoiceCol = Column((ValueDisplay(width=200, get_value=lambda: "Change to: " + selectedDisc(discTable.selectedIndex)), discTable))
+        oldChoiceCol = Column((Label(_("Current: ") + id, align='l', width=200), ))
+        newChoiceCol = Column((ValueDisplay(width=200, get_value=lambda: _("Change to: ") + selectedDisc(discTable.selectedIndex)), discTable))
 
         lastRow = Row((Button("OK", action=panel.dismiss), Button("Cancel", action=cancel)))
         panel.add(Column((oldChoiceCol, newChoiceCol, lastRow)))
@@ -705,8 +770,8 @@ class CameraViewport(GLViewport):
 
         noteTable.selectedIndex = id
 
-        oldChoiceCol = Column((Label("Current: " + notes[id], align='l', width=200), ))
-        newChoiceCol = Column((ValueDisplay(width=200, get_value=lambda: "Change to: " + selectedNote()), noteTable))
+        oldChoiceCol = Column((Label(_("Current: ") + notes[id], align='l', width=200), ))
+        newChoiceCol = Column((ValueDisplay(width=200, get_value=lambda: _("Change to: ") + selectedNote()), noteTable))
 
         lastRow = Row((Button("OK", action=panel.dismiss), Button("Cancel", action=cancel)))
         panel.add(Column((oldChoiceCol, newChoiceCol, lastRow)))
@@ -765,65 +830,61 @@ class CameraViewport(GLViewport):
 
         lineFields = [TextFieldWrapped(width=400) for l in linekeys]
         for l, f in zip(linekeys, lineFields):
+
+            #Fix for the '§ is Ä§' issue
+#             try:
+#                 f.value = tileEntity[l].value.decode("unicode-escape")
+#             except:
+#                 f.value = tileEntity[l].value
             f.value = tileEntity[l].value
 
+            # Double quotes handling
+            if f.value == 'null':
+                f.value = ''
+            else:
+                if f.value.startswith('"') and f.value.endswith('"'):
+                    f.value = f.value[1:-1]
+                if '\\"' in f.value:
+                    f.value = f.value.replace('\\"', '"')
+
         colors = [
-            "\xa70  Black",
-            "\xa71  Dark Blue",
-            "\xa72  Dark Green",
-            "\xa73  Dark Aqua",
-            "\xa74  Dark Red",
-            "\xa75  Dark Purple",
-            "\xa76  Gold",
-            "\xa77  Gray",
-            "\xa78  Dark Gray",
-            "\xa79  Blue",
-            "\xa7a  Green",
-            "\xa7b  Aqua",
-            "\xa7c  Red",
-            "\xa7d  Light Purple",
-            "\xa7e  Yellow",
-            "\xa7f  White",
+            u"§0  Black",
+            u"§1  Dark Blue",
+            u"§2  Dark Green",
+            u"§3  Dark Aqua",
+            u"§4  Dark Red",
+            u"§5  Dark Purple",
+            u"§6  Gold",
+            u"§7  Gray",
+            u"§8  Dark Gray",
+            u"§9  Blue",
+            u"§a  Green",
+            u"§b  Aqua",
+            u"§c  Red",
+            u"§d  Light Purple",
+            u"§e  Yellow",
+            u"§f  White",
         ]
 
         def menu_picked(index):
-            c = u'\xa7' + hex(index)[-1]
+            # Fix for the '§ is Ä§' issue
+#             c = u'\xa7' + hex(index)[-1]
+            c = u"§%d"%index
             currentField = panel.focus_switch.focus_switch
             currentField.text += c  # xxx view hierarchy
             currentField.insertion_point = len(currentField.text)
 
-        class SignEditOperation(Operation):
-            def __init__(self, tool, level):
-                self.tool = tool
-                self.level = level
-                self.undoBackupEntityTag = undoBackupEntityTag
-                self.canUndo = False
-
-            def perform(self, recordUndo=True):
-                if self.level.saving:
-                    alert("Cannot perform action while saving is taking place")
-                    return
-                self.level.addTileEntity(tileEntity)
-                self.canUndo = True
-
-            def undo(self):
-                self.redoBackupEntityTag = copy.deepcopy(tileEntity)
-                self.level.addTileEntity(self.undoBackupEntityTag)
-                return pymclevel.BoundingBox(pymclevel.TileEntity.pos(tileEntity), (1, 1, 1))
-
-            def redo(self):
-                self.level.addTileEntity(self.redoBackupEntityTag)
-                return pymclevel.BoundingBox(pymclevel.TileEntity.pos(tileEntity), (1, 1, 1))
-
         def changeSign():
             unsavedChanges = False
             for l, f in zip(linekeys, lineFields):
-                oldText = "{}".format(tileEntity[l])
-                tileEntity[l] = pymclevel.TAG_String(f.value[:255])
-                if "{}".format(tileEntity[l]) != oldText and not unsavedChanges:
+                oldText = '"{}"'.format(tileEntity[l])
+                # Double quotes handling
+#                 tileEntity[l] = pymclevel.TAG_String(f.value[:255])
+                tileEntity[l] = pymclevel.TAG_String(u'"%s"'%f.value[:255])
+                if '"{}"'.format(tileEntity[l]) != oldText and not unsavedChanges:
                     unsavedChanges = True
             if unsavedChanges:
-                op = SignEditOperation(self.editor, self.editor.level)
+                op = SignEditOperation(self.editor, self.editor.level, tileEntity, undoBackupEntityTag)
                 self.editor.addOperation(op)
                 if op.canUndo:
                     self.editor.addUnsavedEdit()
@@ -945,19 +1006,29 @@ class CameraViewport(GLViewport):
             tileEntity["Command"] = pymclevel.TAG_String()
             tileEntity["CustomName"] = pymclevel.TAG_String("@")
             tileEntity["TrackOutput"] = pymclevel.TAG_Byte(0)
+            tileEntity["SuccessCount"] = pymclevel.TAG_Int(0)
             self.editor.level.addTileEntity(tileEntity)
 
         titleLabel = Label("Edit Command Block")
-        commandField = TextFieldWrapped(width=500)
-        nameField = TextFieldWrapped(width=100)
+        commandField = TextFieldWrapped(width=650)
+        nameField = TextFieldWrapped(width=200)
+        successField = IntInputRow("SuccessCount", min=0, max=15)
         trackOutput = CheckBox()
 
+        # Fix for the '§ is Ä§' issue
+#         try:
+#             commandField.value = tileEntity["Command"].value.decode("unicode-escape")
+#         except:
+#             commandField.value = tileEntity["Command"].value
         commandField.value = tileEntity["Command"].value
+
         oldCommand = commandField.value
         trackOutput.value = tileEntity["TrackOutput"].value
         oldTrackOutput = trackOutput.value
-        nameField.value = tileEntity["CustomName"].value
+        nameField.value = tileEntity.get("CustomName", TAG_String("@")).value
         oldNameField = nameField.value
+        successField.subwidgets[1].value = tileEntity.get("SuccessCount", pymclevel.TAG_Int(0)).value
+        oldSuccess = successField.subwidgets[1].value
 
         class CommandBlockEditOperation(Operation):
             def __init__(self, tool, level):
@@ -983,10 +1054,11 @@ class CameraViewport(GLViewport):
                 return pymclevel.BoundingBox(pymclevel.TileEntity.pos(tileEntity), (1, 1, 1))
 
         def updateCommandBlock():
-            if oldCommand != commandField.value or oldTrackOutput != trackOutput.value or oldNameField != nameField.value:
+            if oldCommand != commandField.value or oldTrackOutput != trackOutput.value or oldNameField != nameField.value or oldSuccess != successField.subwidgets[1].value:
                 tileEntity["Command"] = pymclevel.TAG_String(commandField.value)
                 tileEntity["TrackOutput"] = pymclevel.TAG_Byte(trackOutput.value)
                 tileEntity["CustomName"] = pymclevel.TAG_String(nameField.value)
+                tileEntity["SuccessCount"] = pymclevel.TAG_Int(successField.subwidgets[1].value)
 
                 op = CommandBlockEditOperation(self.editor, self.editor.level)
                 self.editor.addOperation(op)
@@ -999,7 +1071,7 @@ class CameraViewport(GLViewport):
 
         okBTN = Button("OK", action=updateCommandBlock)
         cancel = Button("Cancel", action=panel.dismiss)
-        column = [titleLabel, Label("Command:"), commandField, Row((Label("Custom Name:"), nameField)),
+        column = [titleLabel, Label("Command:"), commandField, Row((Label("Custom Name:"), nameField)), successField,
                   Row((Label("Track Output"), trackOutput)), okBTN, cancel]
         panel.add(Column(column))
         panel.shrink_wrap()
@@ -1074,19 +1146,43 @@ class CameraViewport(GLViewport):
 
         def selectTableRow(i, evt):
             chestWidget.selectedItemIndex = i
+            # Disabling the item selector for now, since we need PE items resources.
+#             if evt.num_clicks > 1:
+#                 selectButtonAction()
+
+        def changeValue(data):
+            s, i, c, d = data
+            s = int(s)
+            s_idx = 0
+            chestWidget.Slot = s
+            chestWidget.id = i
+            chestWidget.Count = int(c)
+            chestWidget.Damage = int(d)
+
 
         chestItemTable.num_rows = lambda: len(tileEntityTag["Items"])
         chestItemTable.row_data = getRowData
         chestItemTable.row_is_selected = lambda x: x == chestWidget.selectedItemIndex
         chestItemTable.click_row = selectTableRow
+        chestItemTable.change_value = changeValue
 
-        maxSlot = pymclevel.TileEntity.maxItems[tileEntityTag["id"].value] - 1
+        def selectButtonAction():
+            SlotEditor(chestItemTable,
+                       (chestWidget.Slot, chestWidget.id or u"", chestWidget.Count, chestWidget.Damage)
+                       ).present()
+
+        maxSlot = pymclevel.TileEntity.maxItems.get(tileEntityTag["id"].value, 27) - 1
         fieldRow = (
             IntInputRow("Slot: ", ref=AttrRef(chestWidget, 'Slot'), min=0, max=maxSlot),
-            TextInputRow("ID / ID Name: ", ref=AttrRef(chestWidget, 'id'), width=300),
+            BasicTextInputRow("ID / ID Name: ", ref=AttrRef(chestWidget, 'id'), width=300),
             # Text to allow the input of internal item names
-            IntInputRow("DMG: ", ref=AttrRef(chestWidget, 'Damage'), min=-32768, max=32767),
-            IntInputRow("Count: ", ref=AttrRef(chestWidget, 'Count'), min=-64, max=64),
+            IntInputRow("DMG: ", ref=AttrRef(chestWidget, 'Damage'), min=0, max=32767),
+            IntInputRow("Count: ", ref=AttrRef(chestWidget, 'Count'), min=-1, max=64),
+            # This button is inactive for now, because we need to work with different IDs types:
+            # * The 'human' IDs: Stone, Glass, Swords...
+            # * The MC ones: minecraft:stone, minecraft:air...
+            # * The PE ones: 0:0, 1:0...
+#             Button("Select", action=selectButtonAction)
         )
 
         def deleteFromWorld():
@@ -1235,22 +1331,153 @@ class CameraViewport(GLViewport):
             if op.canUndo:
                 self.editor.addUnsavedEdit()
 
-    rightMouseDragStart = None
+    @mceutils.alertException
+    def editFlowerPot(self, point):
+        panel = Dialog()
+        tileEntity = self.editor.level.tileEntityAt(*point)
+        undoBackupEntityTag = copy.deepcopy(tileEntity)
+        if not tileEntity:
+            tileEntity = pymclevel.TAG_Compound()
+            tileEntity["id"] = pymclevel.TAG_String("FlowerPot")
+            tileEntity["x"] = pymclevel.TAG_Int(point[0])
+            tileEntity["y"] = pymclevel.TAG_Int(point[1])
+            tileEntity["z"] = pymclevel.TAG_Int(point[2])
+            tileEntity["Item"] = pymclevel.TAG_String("")
+            tileEntity["Data"] = pymclevel.TAG_Int(0)
+            self.editor.level.addTileEntity(tileEntity)
+
+        titleLabel = Label("Edit Flower Pot")
+        Item = TextFieldWrapped(width=300, text=tileEntity["Item"].value)
+        oldItem = Item.value
+        Data = IntField(width=300,text=str(tileEntity["Data"].value))
+        oldData = Data.value
+
+        class FlowerPotEditOperation(Operation):
+            def __init__(self, tool, level):
+                self.tool = tool
+                self.level = level
+                self.undoBackupEntityTag = undoBackupEntityTag
+                self.canUndo = False
+
+            def perform(self, recordUndo=True):
+                if self.level.saving:
+                    alert("Cannot perform action while saving is taking place")
+                    return
+                self.level.addTileEntity(tileEntity)
+                self.canUndo = True
+
+            def undo(self):
+                self.redoBackupEntityTag = copy.deepcopy(tileEntity)
+                self.level.addTileEntity(self.undoBackupEntityTag)
+                return pymclevel.BoundingBox(pymclevel.TileEntity.pos(tileEntity), (1, 1, 1))
+
+            def redo(self):
+                self.level.addTileEntity(self.redoBackupEntityTag)
+                return pymclevel.BoundingBox(pymclevel.TileEntity.pos(tileEntity), (1, 1, 1))
+
+        def updateFlowerPot():
+            if oldData != Data.value or oldItem != Item.value:
+                tileEntity["Item"] = pymclevel.TAG_String(Item.value)
+                tileEntity["Data"] = pymclevel.TAG_Int(Data.value)
+
+                op = FlowerPotEditOperation(self.editor, self.editor.level)
+                self.editor.addOperation(op)
+                if op.canUndo:
+                    self.editor.addUnsavedEdit()
+
+                chunk = self.editor.level.getChunk(int(int(point[0]) / 16), int(int(point[2]) / 16))
+                chunk.dirty = True
+                panel.dismiss()
+
+        okBtn = Button("OK", action=updateFlowerPot)
+        cancel = Button("Cancel", action=panel.dismiss)
+        panel.add(Column((titleLabel, Row((Label("Item"), Item)), Row((Label("Data"), Data)), okBtn, cancel)))
+        panel.shrink_wrap()
+        panel.present()
+
+    @mceutils.alertException
+    def editEnchantmentTable(self, point):
+        panel = Dialog()
+        tileEntity = self.editor.level.tileEntityAt(*point)
+        undoBackupEntityTag = copy.deepcopy(tileEntity)
+        if not tileEntity:
+            tileEntity = pymclevel.TAG_Compound()
+            tileEntity["id"] = pymclevel.TAG_String("EnchantTable")
+            tileEntity["x"] = pymclevel.TAG_Int(point[0])
+            tileEntity["y"] = pymclevel.TAG_Int(point[1])
+            tileEntity["z"] = pymclevel.TAG_Int(point[2])
+            tileEntity["CustomName"] = pymclevel.TAG_String("")
+            self.editor.level.addTileEntity(tileEntity)
+
+        titleLabel = Label("Edit Enchantment Table")
+        try:
+            name = tileEntity["CustomName"].value
+        except:
+            name = ""
+        name = TextFieldWrapped(width=300, text=name)
+        oldName = name.value
+
+        class EnchantmentTableEditOperation(Operation):
+            def __init__(self, tool, level):
+                self.tool = tool
+                self.level = level
+                self.undoBackupEntityTag = undoBackupEntityTag
+                self.canUndo = False
+
+            def perform(self, recordUndo=True):
+                if self.level.saving:
+                    alert("Cannot perform action while saving is taking place")
+                    return
+                self.level.addTileEntity(tileEntity)
+                self.canUndo = True
+
+            def undo(self):
+                self.redoBackupEntityTag = copy.deepcopy(tileEntity)
+                self.level.addTileEntity(self.undoBackupEntityTag)
+                return pymclevel.BoundingBox(pymclevel.TileEntity.pos(tileEntity), (1, 1, 1))
+
+            def redo(self):
+                self.level.addTileEntity(self.redoBackupEntityTag)
+                return pymclevel.BoundingBox(pymclevel.TileEntity.pos(tileEntity), (1, 1, 1))
+
+        def updateEnchantmentTable():
+            if oldName != name.value:
+                tileEntity["CustomName"] = pymclevel.TAG_String(name.value)
+
+                op = EnchantmentTableEditOperation(self.editor, self.editor.level)
+                self.editor.addOperation(op)
+                if op.canUndo:
+                    self.editor.addUnsavedEdit()
+
+                chunk = self.editor.level.getChunk(int(int(point[0]) / 16), int(int(point[2]) / 16))
+                chunk.dirty = True
+                panel.dismiss()
+
+        okBtn = Button("OK", action=updateEnchantmentTable)
+        cancel = Button("Cancel", action=panel.dismiss)
+        panel.add(Column((titleLabel, Row((Label("Custom Name"), name)), okBtn, cancel)))
+        panel.shrink_wrap()
+        panel.present()
+
+    should_lock = False
 
     def rightClickDown(self, evt):
-        self.rightMouseDragStart = datetime.now()
+        # self.rightMouseDragStart = datetime.now()
+        self.should_lock = True
         self.toggleMouseLook()
 
     def rightClickUp(self, evt):
-        if self.rightMouseDragStart is None:
-            return
+        if not self.should_lock and self.editor.level:
+            self.toggleMouseLook()
+        # if self.rightMouseDragStart is None:
+        #     return
 
-        td = datetime.now() - self.rightMouseDragStart
-        # except AttributeError:
-        # return
-        # print "RightClickUp: ", td
-        if td.seconds > 0 or td.microseconds > 280000:
-            self.mouseLookOff()
+        # td = datetime.now() - self.rightMouseDragStart
+        # # except AttributeError:
+        # # return
+        # # print "RightClickUp: ", td
+        # if td.microseconds > 180000:
+        #     self.mouseLookOff()
 
     def leftClickDown(self, evt):
         self.editor.toolMouseDown(evt, self.blockFaceUnderCursor)
@@ -1272,8 +1499,12 @@ class CameraViewport(GLViewport):
                                 pymclevel.alphaMaterials.WallSign.ID: self.editSign,
                                 pymclevel.alphaMaterials.MobHead.ID: self.editSkull,
                                 pymclevel.alphaMaterials.CommandBlock.ID: self.editCommandBlock,
+                                210: self.editCommandBlock,
+                                211: self.editCommandBlock,
                                 pymclevel.alphaMaterials.Jukebox.ID: self.editJukebox,
-                                pymclevel.alphaMaterials.NoteBlock.ID: self.editNoteBlock
+                                pymclevel.alphaMaterials.NoteBlock.ID: self.editNoteBlock,
+                                pymclevel.alphaMaterials.FlowerPot.ID: self.editFlowerPot,
+                                pymclevel.alphaMaterials.EnchantmentTable.ID: self.editEnchantmentTable
                             }
                             edit = blockEditors.get(block)
                             if edit:
@@ -1345,7 +1576,7 @@ class CameraViewport(GLViewport):
 
         self.editor.mouseEntered = True
         if self.mouseMovesCamera:
-
+            self.should_lock = False
             pitchAdjust = sensitivityAdjust(evt.rel[1])
             if self.invertMousePitch:
                 pitchAdjust = -pitchAdjust
@@ -1364,12 +1595,42 @@ class CameraViewport(GLViewport):
                 #    event.get(MOUSEMOTION)
                 #    self.oldMousePosition = (self.startingMousePosition)
 
+        def showCommands():
+            try:
+                if point and self.editor.level:
+                    block = self.editor.level.blockAt(*point)
+                    if block == pymclevel.alphaMaterials.CommandBlock.ID or block == 210 or block == 211:
+                        self.hoveringCommandBlock[0] = True
+                        tileEntity = self.editor.level.tileEntityAt(*point)
+                        if tileEntity:
+                            self.hoveringCommandBlock[1] = tileEntity.get("Command", TAG_String("")).value
+                            if len(self.hoveringCommandBlock[1]) > 1500:
+                                self.hoveringCommandBlock[1] = self.hoveringCommandBlock[1][:1500] + "\n**COMMAND IS TOO LONG TO SHOW MORE**"
+                        else:
+                            self.hoveringCommandBlock[0] = False
+                    else:
+                        self.hoveringCommandBlock[0] = False
+            except (EnvironmentError, pymclevel.ChunkNotPresent):
+                pass
+
+        self.showCommands = showCommands
+        if config.settings.showCommands.get():
+            point, face = self.blockFaceUnderCursor
+            if point is not None:
+                point = map(lambda x: int(numpy.floor(x)), point)
+                if self.editor.currentTool is self.editor.selectionTool and self.editor.selectionTool.infoKey == 0:
+                    showCommands()
+                else:
+                    self.hoveringCommandBlock[0] = False
+
     def activeevent(self, evt):
         if evt.state & 0x2 and evt.gain != 0:
             self.avoidMouseJumpBug = 1
 
     @property
     def tooltipText(self):
+        if self.hoveringCommandBlock[0] and (self.editor.currentTool is self.editor.selectionTool and self.editor.selectionTool.infoKey == 0):
+            return self.hoveringCommandBlock[1] or "[Empty]"
         return self.editor.currentTool.worldTooltipText
 
     floorQuad = numpy.array(((-4000.0, 0.0, -4000.0),

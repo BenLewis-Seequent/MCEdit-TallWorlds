@@ -5,13 +5,11 @@ Created on Jul 22, 2011
 '''
 import collections
 
-import copy
 from datetime import datetime
 import itertools
 from logging import getLogger
 from math import floor
 import os
-import re
 import random
 import shutil
 import struct
@@ -21,7 +19,6 @@ import weakref
 import zlib
 import sys
 
-import blockrotation
 from box import BoundingBox
 from entity import Entity, TileEntity, TileTick
 from faces import FaceXDecreasing, FaceXIncreasing, FaceZDecreasing, FaceZIncreasing
@@ -32,6 +29,8 @@ import nbt
 from numpy import array, clip, maximum, zeros
 from regionfile import MCRegionFile
 from pc_metadata import PCMetadata, SessionLockLost
+import logging
+from uuid import UUID
 
 log = getLogger(__name__)
 
@@ -889,9 +888,6 @@ class AnvilWorldFolder(object):
 
         return path
 
-    def setPath(self, path):
-        self.filename = path
-
     # --- Region files ---
 
     def getRegionFilename(self, rx, rz):
@@ -1013,6 +1009,7 @@ class MCInfdevOldLevel(ChunkedLevelMixin, EntityLevel, PCMetadata):
         If you try to create an existing world, its level.dat will be replaced.
         """
 
+        super(MCInfdevOldLevel, self).__init__()
         self.Length = 0
         self.Width = 0
         self.Height = 256
@@ -1036,15 +1033,20 @@ class MCInfdevOldLevel(ChunkedLevelMixin, EntityLevel, PCMetadata):
         self.readonly = readonly
         if not readonly:
             self.acquireSessionLock()
-
             workFolderPath = self.worldFolder.getFolderPath("##MCEDIT.TEMP##")
+            workFolderPath2 = self.worldFolder.getFolderPath("##MCEDIT.TEMP2##")
             if os.path.exists(workFolderPath):
                 # xxxxxxx Opening a world a second time deletes the first world's work folder and crashes when the first
                 # world tries to read a modified chunk from the work folder. This mainly happens when importing a world
                 # into itself after modifying it.
                 shutil.rmtree(workFolderPath, True)
+            if os.path.exists(workFolderPath2):
+                shutil.rmtree(workFolderPath2, True)
 
             self.unsavedWorkFolder = AnvilWorldFolder(workFolderPath)
+            self.fileEditsFolder = AnvilWorldFolder(workFolderPath2)
+
+            self.editFileNumber = 1
 
         # maps (cx, cz) pairs to AnvilChunk
         self._loadedChunks = weakref.WeakValueDictionary()
@@ -1063,7 +1065,6 @@ class MCInfdevOldLevel(ChunkedLevelMixin, EntityLevel, PCMetadata):
 
         if not readonly:
             self.initPlayers()
-
             self.preloadDimensions()
 
     def getFilePath(self, filename):
@@ -1133,6 +1134,7 @@ class MCInfdevOldLevel(ChunkedLevelMixin, EntityLevel, PCMetadata):
         try:
             self.checkSessionLock()
             shutil.rmtree(self.unsavedWorkFolder.filename, True)
+            shutil.rmtree(self.fileEditsFolder.filename, True)
         except SessionLockLost:
             pass
 

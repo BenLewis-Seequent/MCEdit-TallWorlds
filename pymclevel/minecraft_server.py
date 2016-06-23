@@ -4,6 +4,7 @@ import logging
 import os
 from os.path import dirname, join, basename
 import random
+from pymclevel import PocketLeveldbWorld
 import re
 import shutil
 import subprocess
@@ -274,6 +275,7 @@ class MCServerChunkGenerator(object):
     javaExe = findJava()
     jarStorage = None
     tempWorldCache = {}
+    processes = []
 
     def __init__(self, version=None, jarfile=None, jarStorage=None):
 
@@ -290,6 +292,7 @@ class MCServerChunkGenerator(object):
                     version or "(latest)", self.jarStorage.cacheDir))
         self.serverJarFile = jarfile
         self.serverVersion = version or self._serverVersion()
+        atexit.register(MCServerChunkGenerator.terminateProcesses)
 
     @classmethod
     def getDefaultJarStorage(cls):
@@ -423,6 +426,7 @@ class MCServerChunkGenerator(object):
         (tempWorld.parentWorld or tempWorld).loadLevelDat()  # reload version number
 
     def copyChunkAtPosition(self, tempWorld, level, cx, cz):
+
         if level.containsChunk(cx, cz):
             return
         try:
@@ -432,8 +436,10 @@ class MCServerChunkGenerator(object):
                                                                                                      self.serverJarFile,
                                                                                                      e), sys.exc_info()[
                 2])
-
-        level.worldFolder.saveChunk(cx, cz, tempChunkBytes)
+        if isinstance(level, PocketLeveldbWorld):
+            level.saveGeneratedChunk(cx, cz, tempChunkBytes)
+        else:
+            level.worldFolder.saveChunk(cx, cz, tempChunkBytes)
         level._allChunks = None
 
     def generateChunkInLevel(self, level, cx, cz):
@@ -443,7 +449,7 @@ class MCServerChunkGenerator(object):
         self.generateAtPosition(tempWorld, tempDir, cx, cz)
         self.copyChunkAtPosition(tempWorld, level, cx, cz)
 
-    minRadius = 5
+    minRadius = 12
     maxRadius = 20
 
     def createLevel(self, level, box, simulate=False, **kw):
@@ -550,9 +556,17 @@ class MCServerChunkGenerator(object):
                                 stderr=subprocess.STDOUT,
                                 universal_newlines=True,
         )
-
-        atexit.register(proc.terminate)
+        cls.processes.append(proc)
         return proc
+    
+    @classmethod
+    def terminateProcesses(cls):
+        for process in cls.processes:
+            if process.poll():
+                try:
+                    process.terminate()
+                except:
+                    pass
 
     def _serverVersion(self):
         return self._serverVersionFromJarFile(self.serverJarFile)

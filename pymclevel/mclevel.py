@@ -174,11 +174,14 @@ from indev import MCIndevLevel
 from infiniteworld import MCInfdevOldLevel
 from javalevel import MCJavaLevel
 from logging import getLogger
+import logging
 from directories import minecraftSaveFileDir
 import nbt
 from numpy import fromstring
 import os
-from pocket import PocketWorld, NewPocketWorld
+from pocket import PocketWorld
+from leveldbpocket import PocketLeveldbWorld
+from pymclevel import leveldbpocket
 from schematic import INVEditChest, MCSchematic, ZipSchematic
 from tall_worlds import TWLevel
 import sys
@@ -227,11 +230,14 @@ def fromFile(filename, loadInfinite=True, readonly=False):
             raise ValueError("Asked to load {0} which is an infinite level, loadInfinite was False".format(
                 os.path.basename(filename)))
 
-    if NewPocketWorld._isLevel(filename):
-        raise ValueError("Don't have Pocket Edition 0.9+ support yet!")
+    if PocketLeveldbWorld._isLevel(filename):
+        if leveldbpocket.leveldb_available:
+            return PocketLeveldbWorld(filename)
+        else:
+            logging.exception("Pocket support has failed")
 
     if os.path.isdir(filename):
-        raise ValueError("Folder {0} was not identified as a Minecraft level.".format(os.path.basename(filename)))
+        logging.exception("World load failed, trying to open a directory instead of a file")
 
     f = file(filename, 'rb')
     rawdata = f.read()

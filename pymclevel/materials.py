@@ -4,7 +4,8 @@ import traceback
 from os.path import join
 from collections import defaultdict
 from pprint import pformat
-
+import mclangres
+import json
 import os
 
 NOTEX = (0x1F0, 0x1F0)
@@ -145,17 +146,20 @@ class MCMaterials(object):
             return self.blockWithID(id, blockData)
         return self.blockWithID(key)
 
-    def blocksMatching(self, name):
+    def blocksMatching(self, name, names=None):
         toReturn = []
         name = name.lower()
         spiltNames = name.split(" ")
         amount = len(spiltNames)
-        for v in self.allBlocks:
-            nameParts = v.name.lower().split(" ")
-            for anotherName in v.aka.lower().split(" "):
-                nameParts.append(anotherName)
-            for anotherName in v.search.lower().split(" "):
-                nameParts.append(anotherName)
+        for i, v in enumerate(self.allBlocks):
+            if names is None:
+                nameParts = v.name.lower().split(" ")
+                for anotherName in v.aka.lower().split(" "):
+                    nameParts.append(anotherName)
+                for anotherName in v.search.lower().split(" "):
+                    nameParts.append(anotherName)
+            else:
+                nameParts = names[i].lower().split(" ")
             i = 0
             spiltNamesUsed = []
             for v2 in nameParts:
@@ -184,11 +188,11 @@ class MCMaterials(object):
 
             f = pkg_resources.resource_stream(__name__, filename)
         except (ImportError, IOError), e:
-            print "Cannot get resource_stream for ", filename, e
+            log.debug("Cannot get resource_stream for %s %s"%(filename, e))
             root = os.environ.get("PYMCLEVEL_YAML_ROOT", "pymclevel")  # fall back to cwd as last resort
             path = join(root, filename)
 
-            log.exception("Failed to read %s using pkg_resources. Trying %s instead." % (filename, path))
+            log.debug("Failed to read %s using pkg_resources. Trying %s instead." % (filename, path))
 
             f = file(path)
         try:
@@ -306,7 +310,8 @@ class MCMaterials(object):
 
         block = Block(self, blockID, blockData, stringName)
 
-        self.allBlocks.append(block)
+        if kw.pop('invalid', 'false') == 'false':
+            self.allBlocks.append(block)
         self.blocksByType[type].append(block)
 
         self.blocksByID[blockID, blockData] = block
@@ -589,6 +594,23 @@ alphaMaterials.BirchDoor = alphaMaterials[194, 0]
 alphaMaterials.JungleDoor = alphaMaterials[195, 0]
 alphaMaterials.AcaciaDoor = alphaMaterials[196, 0]
 alphaMaterials.DarkOakDoor = alphaMaterials[197, 0]
+alphaMaterials.EndRod = alphaMaterials[198, 0]
+alphaMaterials.ChorusPlant = alphaMaterials[199, 0]
+alphaMaterials.ChorusFlowerAlive = alphaMaterials[200, 0]
+alphaMaterials.ChorusFlowerDead = alphaMaterials[200, 5]
+alphaMaterials.Purpur = alphaMaterials[201, 0]
+alphaMaterials.PurpurPillar = alphaMaterials[202, 0]
+alphaMaterials.PurpurStairs = alphaMaterials[203, 0]
+alphaMaterials.PurpurSlab = alphaMaterials[205, 0]
+alphaMaterials.EndStone = alphaMaterials[206, 0]
+alphaMaterials.BeetRoot = alphaMaterials[207, 0]
+alphaMaterials.GrassPath = alphaMaterials[208, 0]
+alphaMaterials.EndGateway = alphaMaterials[209, 0]
+alphaMaterials.CommandBlockRepeating = alphaMaterials[210, 0]
+alphaMaterials.CommandBlockChain = alphaMaterials[211, 0]
+alphaMaterials.FrostedIce = alphaMaterials[212, 0]
+alphaMaterials.StructureVoid = alphaMaterials[217, 0]
+alphaMaterials.StructureBlock = alphaMaterials[255, 0]
 
 # --- Classic static block defs ---
 classicMaterials.Stone = classicMaterials[1]
@@ -731,20 +753,31 @@ pocketMaterials.Gravel = pocketMaterials[13, 0]
 pocketMaterials.GoldOre = pocketMaterials[14, 0]
 pocketMaterials.IronOre = pocketMaterials[15, 0]
 pocketMaterials.CoalOre = pocketMaterials[16, 0]
+
 pocketMaterials.Wood = pocketMaterials[17, 0]
 pocketMaterials.PineWood = pocketMaterials[17, 1]
 pocketMaterials.BirchWood = pocketMaterials[17, 2]
+pocketMaterials.JungleWood = pocketMaterials[17, 3]
 pocketMaterials.Leaves = pocketMaterials[18, 0]
+pocketMaterials.PineLeaves = pocketMaterials[18, 1]
+pocketMaterials.BirchLeaves = pocketMaterials[18, 2]
+pocketMaterials.JungleLeaves = pocketMaterials[18, 3]
+
+pocketMaterials.Sponge = pocketMaterials[19, 0]
 pocketMaterials.Glass = pocketMaterials[20, 0]
 
 pocketMaterials.LapisLazuliOre = pocketMaterials[21, 0]
 pocketMaterials.LapisLazuliBlock = pocketMaterials[22, 0]
 pocketMaterials.Sandstone = pocketMaterials[24, 0]
+pocketMaterials.NoteBlock = pocketMaterials[25, 0]
 pocketMaterials.Bed = pocketMaterials[26, 0]
+pocketMaterials.PoweredRail = pocketMaterials[27, 0]
+pocketMaterials.DetectorRail = pocketMaterials[28, 0]
 pocketMaterials.Web = pocketMaterials[30, 0]
 pocketMaterials.UnusedShrub = pocketMaterials[31, 0]
 pocketMaterials.TallGrass = pocketMaterials[31, 1]
 pocketMaterials.Shrub = pocketMaterials[31, 2]
+
 pocketMaterials.WhiteWool = pocketMaterials[35, 0]
 pocketMaterials.OrangeWool = pocketMaterials[35, 1]
 pocketMaterials.MagentaWool = pocketMaterials[35, 2]
@@ -761,12 +794,14 @@ pocketMaterials.BrownWool = pocketMaterials[35, 12]
 pocketMaterials.DarkGreenWool = pocketMaterials[35, 13]
 pocketMaterials.RedWool = pocketMaterials[35, 14]
 pocketMaterials.BlackWool = pocketMaterials[35, 15]
+
 pocketMaterials.Flower = pocketMaterials[37, 0]
 pocketMaterials.Rose = pocketMaterials[38, 0]
 pocketMaterials.BrownMushroom = pocketMaterials[39, 0]
 pocketMaterials.RedMushroom = pocketMaterials[40, 0]
 pocketMaterials.BlockofGold = pocketMaterials[41, 0]
 pocketMaterials.BlockofIron = pocketMaterials[42, 0]
+
 pocketMaterials.DoubleStoneSlab = pocketMaterials[43, 0]
 pocketMaterials.DoubleSandstoneSlab = pocketMaterials[43, 1]
 pocketMaterials.DoubleWoodenSlab = pocketMaterials[43, 2]
@@ -777,6 +812,7 @@ pocketMaterials.SandstoneSlab = pocketMaterials[44, 1]
 pocketMaterials.WoodenSlab = pocketMaterials[44, 2]
 pocketMaterials.CobblestoneSlab = pocketMaterials[44, 3]
 pocketMaterials.BrickSlab = pocketMaterials[44, 4]
+
 pocketMaterials.Brick = pocketMaterials[45, 0]
 pocketMaterials.TNT = pocketMaterials[46, 0]
 pocketMaterials.Bookshelf = pocketMaterials[47, 0]
@@ -785,8 +821,10 @@ pocketMaterials.Obsidian = pocketMaterials[49, 0]
 
 pocketMaterials.Torch = pocketMaterials[50, 0]
 pocketMaterials.Fire = pocketMaterials[51, 0]
+pocketMaterials.MonsterSpawner = pocketMaterials[52, 0]
 pocketMaterials.WoodenStairs = pocketMaterials[53, 0]
 pocketMaterials.Chest = pocketMaterials[54, 0]
+pocketMaterials.RedstoneWire = pocketMaterials[55, 0]
 pocketMaterials.DiamondOre = pocketMaterials[56, 0]
 pocketMaterials.BlockofDiamond = pocketMaterials[57, 0]
 pocketMaterials.CraftingTable = pocketMaterials[58, 0]
@@ -794,12 +832,21 @@ pocketMaterials.Crops = pocketMaterials[59, 0]
 pocketMaterials.Farmland = pocketMaterials[60, 0]
 pocketMaterials.Furnace = pocketMaterials[61, 0]
 pocketMaterials.LitFurnace = pocketMaterials[62, 0]
+pocketMaterials.Sign = pocketMaterials[63,0]
 pocketMaterials.WoodenDoor = pocketMaterials[64, 0]
 pocketMaterials.Ladder = pocketMaterials[65, 0]
+pocketMaterials.Rail = pocketMaterials[66, 0]
 pocketMaterials.StoneStairs = pocketMaterials[67, 0]
+pocketMaterials.WallSign = pocketMaterials[68,0]
+pocketMaterials.Lever = pocketMaterials[69,0]
+pocketMaterials.StoneFloorPlate = pocketMaterials[70,0]
 pocketMaterials.IronDoor = pocketMaterials[71, 0]
+pocketMaterials.WoodFloorPlate = pocketMaterials[72,0]
 pocketMaterials.RedstoneOre = pocketMaterials[73, 0]
 pocketMaterials.RedstoneOreGlowing = pocketMaterials[74, 0]
+pocketMaterials.RedstoneTorchOff = pocketMaterials[75, 0]
+pocketMaterials.RedstoneTorchOn = pocketMaterials[76, 0]
+pocketMaterials.Button = pocketMaterials[77, 0]
 pocketMaterials.SnowLayer = pocketMaterials[78, 0]
 pocketMaterials.Ice = pocketMaterials[79, 0]
 
@@ -808,20 +855,102 @@ pocketMaterials.Cactus = pocketMaterials[81, 0]
 pocketMaterials.Clay = pocketMaterials[82, 0]
 pocketMaterials.SugarCane = pocketMaterials[83, 0]
 pocketMaterials.Fence = pocketMaterials[85, 0]
+pocketMaterials.Pumpkin = pocketMaterials[86, 0]
+pocketMaterials.Netherrack = pocketMaterials[87, 0]
+pocketMaterials.SoulSand = pocketMaterials[88, 0]
 pocketMaterials.Glowstone = pocketMaterials[89, 0]
+pocketMaterials.NetherPortal = pocketMaterials[90, 0]
+pocketMaterials.JackOLantern = pocketMaterials[91, 0]
+pocketMaterials.Cake = pocketMaterials[92, 0]
 pocketMaterials.InvisibleBedrock = pocketMaterials[95, 0]
 pocketMaterials.Trapdoor = pocketMaterials[96, 0]
 
+pocketMaterials.MonsterEgg = pocketMaterials[97, 0]
 pocketMaterials.StoneBricks = pocketMaterials[98, 0]
+pocketMaterials.BrownMushroom = pocketMaterials[99, 0]
+pocketMaterials.RedMushroom = pocketMaterials[100, 0]
+pocketMaterials.IronBars = pocketMaterials[101, 0]
 pocketMaterials.GlassPane = pocketMaterials[102, 0]
 pocketMaterials.Watermelon = pocketMaterials[103, 0]
+pocketMaterials.PumpkinStem = pocketMaterials[104, 0]
 pocketMaterials.MelonStem = pocketMaterials[105, 0]
+pocketMaterials.Vines = pocketMaterials[106, 0]
 pocketMaterials.FenceGate = pocketMaterials[107, 0]
 pocketMaterials.BrickStairs = pocketMaterials[108, 0]
+pocketMaterials.StoneBrickStairs = pocketMaterials[109, 0]
+pocketMaterials.Mycelium = pocketMaterials[110, 0]
+pocketMaterials.Lilypad = pocketMaterials[111, 0]
 
+pocketMaterials.NetherBrick = pocketMaterials[112, 0]
+pocketMaterials.NetherBrickFence = pocketMaterials[113, 0]
+pocketMaterials.NetherBrickStairs = pocketMaterials[114, 0]
+pocketMaterials.NetherWart = pocketMaterials[115, 0]
+
+pocketMaterials.EnchantmentTable = pocketMaterials[116, 0]
+pocketMaterials.BrewingStand = pocketMaterials[117, 0]
+pocketMaterials.EndPortalFrame = pocketMaterials[120, 0]
+pocketMaterials.EndStone = pocketMaterials[121, 0]
+pocketMaterials.RedstoneLampoff = pocketMaterials[122, 0]
+pocketMaterials.RedstoneLampon = pocketMaterials[123, 0]
+pocketMaterials.ActivatorRail = pocketMaterials[126, 0]
+pocketMaterials.Cocoa = pocketMaterials[127, 0]
+pocketMaterials.SandstoneStairs = pocketMaterials[128, 0]
+pocketMaterials.EmeraldOre = pocketMaterials[129, 0]
+pocketMaterials.TripwireHook = pocketMaterials[131, 0]
+pocketMaterials.Tripwire = pocketMaterials[132, 0]
+pocketMaterials.BlockOfEmerald = pocketMaterials[133, 0]
+
+pocketMaterials.SpruceWoodStairs = pocketMaterials[134, 0]
+pocketMaterials.BirchWoodStairs = pocketMaterials[135, 0]
+pocketMaterials.JungleWoodStairs = pocketMaterials[136, 0]
+
+pocketMaterials.CobblestoneWall = pocketMaterials[139, 0]
+pocketMaterials.FlowerPot = pocketMaterials[140, 0]
+pocketMaterials.Carrots = pocketMaterials[141, 0]
+pocketMaterials.Potato = pocketMaterials[142, 0]
+pocketMaterials.WoodenButton = pocketMaterials[143, 0]
+pocketMaterials.MobHead = pocketMaterials[144, 0]
+pocketMaterials.Anvil = pocketMaterials[145, 0]
+pocketMaterials.TrappedChest = pocketMaterials[146, 0]
+pocketMaterials.WeightedPressurePlateLight = pocketMaterials[147, 0]
+pocketMaterials.WeightedPressurePlateHeavy = pocketMaterials[148, 0]
+pocketMaterials.DaylightSensor = pocketMaterials[151, 0]
+pocketMaterials.BlockOfRedstone = pocketMaterials[152, 0]
+pocketMaterials.NetherQuartzOre = pocketMaterials[153, 0]
+pocketMaterials.BlockOfQuartz = pocketMaterials[155, 0]
+pocketMaterials.DoubleWoodenSlab = pocketMaterials[157, 0]
+pocketMaterials.WoodenSlab = pocketMaterials[158, 0]
+pocketMaterials.StainedClay = pocketMaterials[159, 0]
+pocketMaterials.AcaciaLeaves = pocketMaterials[161, 0]
+pocketMaterials.AcaciaWood = pocketMaterials[162, 0]
+pocketMaterials.AcaciaWoodStairs = pocketMaterials[163, 0]
+pocketMaterials.DarkOakWoodStairs = pocketMaterials[164, 0]
+pocketMaterials.IronTrapdoor = pocketMaterials[167, 0]
+pocketMaterials.HayBale = pocketMaterials[170, 0]
+pocketMaterials.Carpet = pocketMaterials[171, 0]
+pocketMaterials.HardenedClay = pocketMaterials[172, 0]
+pocketMaterials.BlockOfCoal = pocketMaterials[173, 0]
+pocketMaterials.PackedIce = pocketMaterials[174, 0]
+pocketMaterials.Sunflower = pocketMaterials[175, 0]
+pocketMaterials.DaylightSensorOn = pocketMaterials[178, 0]
+
+pocketMaterials.SpruceFenceGate = pocketMaterials[183, 0]
+pocketMaterials.BirchFenceGate = pocketMaterials[184, 0]
+pocketMaterials.JungleFenceGate = pocketMaterials[185, 0]
+pocketMaterials.DarkOakFenceGate = pocketMaterials[186, 0]
+pocketMaterials.AcaciaFenceGate = pocketMaterials[187, 0]
+pocketMaterials.GrassPath = pocketMaterials[198, 0]
+pocketMaterials.ItemFrame = pocketMaterials[199, 0]
+
+pocketMaterials.Podzol = pocketMaterials[243, 0]
+pocketMaterials.Beetroot = pocketMaterials[244, 0]
+pocketMaterials.StoneCutter = pocketMaterials[245, 0]
 pocketMaterials.GlowingObsidian = pocketMaterials[246, 0]
 pocketMaterials.NetherReactor = pocketMaterials[247, 0]
 pocketMaterials.NetherReactorUsed = pocketMaterials[247, 1]
+pocketMaterials.UpdateGameBlock1 = pocketMaterials[248, 0]
+pocketMaterials.UpdateGameBlock2 = pocketMaterials[249, 0]
+pocketMaterials.info_reserved6 = pocketMaterials[255, 0]
 
 
 def printStaticDefs(name):
@@ -955,81 +1084,56 @@ for b in alphaMaterials:
     if b.ID == 0:
         b.stringID = "air"
     block_map[b.ID] = "minecraft:"+b.stringID
+  
+fp = open(os.path.join("pymclevel","blockstate_definitions.json"))
+blockstates = json.load(fp)
+fp.close()
 
-'''
-block_map_old = {
-    0: "minecraft:air", 1: "minecraft:stone", 2: "minecraft:grass", 3: "minecraft:dirt", 4: "minecraft:cobblestone",
-    5: "minecraft:planks", 6: "minecraft:sapling",
-    7: "minecraft:bedrock", 8: "minecraft:flowing_water", 9: "minecraft:water", 10: "minecraft:flowing_lava",
-    11: "minecraft:lava", 12: "minecraft:sand", 13: "minecraft:gravel",
-    14: "minecraft:gold_ore", 15: "minecraft:iron_ore", 16: "minecraft:coal_ore", 17: "minecraft:log",
-    18: "minecraft:leaves", 19: "minecraft:sponge", 20: "minecraft:glass",
-    21: "minecraft:lapis_ore", 22: "minecraft:lapis_block", 23: "minecraft:dispenser", 24: "minecraft:sandstone",
-    25: "minecraft:noteblock", 26: "minecraft:bed",
-    27: "minecraft:golden_rail", 28: "minecraft:detector_rail", 29: "minecraft:sticky_piston", 30: "minecraft:web",
-    31: "minecraft:tallgrass", 32: "minecraft:deadbush",
-    33: "minecraft:piston", 34: "minecraft:piston_head", 35: "minecraft:wool", 36: "minecraft:piston_extension",
-    37: "minecraft:yellow_flower", 38: "minecraft:red_flower",
-    39: "minecraft:brown_mushroom", 40: "minecraft:red_mushroom", 41: "minecraft:gold_block",
-    42: "minecraft:iron_block", 43: "minecraft:double_stone_slab",
-    44: "minecraft:stone_slab", 45: "minecraft:brick_block", 46: "minecraft:tnt", 47: "minecraft:bookshelf",
-    48: "minecraft:mossy_cobblestone", 49: "minecraft:obsidian",
-    50: "minecraft:torch", 51: "minecraft:fire", 52: "minecraft:mob_spawner", 53: "minecraft:oak_stairs",
-    54: "minecraft:chest", 55: "minecraft:redstone_wire",
-    56: "minecraft:diamond_ore", 57: "minecraft:diamond_block", 58: "minecraft:crafting_table", 59: "minecraft:wheat",
-    60: "minecraft:farmland", 61: "minecraft:furnace",
-    62: "minecraft:lit_furnace", 63: "minecraft:standing_sign", 64: "minecraft:wooden_door", 65: "minecraft:ladder",
-    66: "minecraft:rail", 67: "minecraft:stone_stairs",
-    68: "minecraft:wall_sign", 69: "minecraft:lever", 70: "minecraft:stone_pressure_plate", 71: "minecraft:iron_door",
-    72: "minecraft:wooden_pressure_plate",
-    73: "minecraft:redstone_ore", 74: "minecraft:lit_redstone_ore", 75: "minecraft:unlit_redstone_torch",
-    76: "minecraft:redstone_torch", 77: "minecraft:stone_button",
-    78: "minecraft:snow_layer", 79: "minecraft:ice", 80: "minecraft:snow", 81: "minecraft:cactus", 82: "minecraft:clay",
-    83: "minecraft:reeds", 84: "minecraft:jukebox",
-    85: "minecraft:fence", 86: "minecraft:pumpkin", 87: "minecraft:netherrack", 88: "minecraft:soul_sand",
-    89: "minecraft:glowstone", 90: "minecraft:portal",
-    91: "minecraft:lit_pumpkin", 92: "minecraft:cake", 93: "minecraft:unpowered_repeater",
-    94: "minecraft:powered_repeater",
-    95: "minecraft:stained_glass", 96: "minecraft:trapdoor", 97: "minecraft:monster_egg", 98: "minecraft:stonebrick",
-    99: "minecraft:brown_mushroom_block", 100: "minecraft:red_mushroom_block", 101: "minecraft:iron_bars",
-    102: "minecraft:glass_pane", 103: "minecraft:melon_block",
-    104: "minecraft:pumpkin_stem", 105: "minecraft:melon_stem", 106: "minecraft:vine", 107: "minecraft:fence_gate",
-    108: "minecraft:brick_stairs", 109: "minecraft:stone_brick_stairs",
-    110: "minecraft:mycelium", 111: "minecraft:waterlily", 112: "minecraft:nether_brick",
-    113: "minecraft:nether_brick_fence", 114: "minecraft:nether_brick_stairs",
-    115: "minecraft:nether_wart", 116: "minecraft:enchanting_table", 117: "minecraft:brewing_stand",
-    118: "minecraft:cauldron", 119: "minecraft:end_portal",
-    120: "minecraft:end_portal_frame", 121: "minecraft:end_stone", 122: "minecraft:dragon_egg",
-    123: "minecraft:redstone_lamp", 124: "minecraft:lit_redstone_lamp",
-    125: "minecraft:double_wooden_slab", 126: "minecraft:wooden_slab", 127: "minecraft:cocoa",
-    128: "minecraft:sandstone_stairs", 129: "minecraft:emerald_ore",
-    130: "minecraft:ender_chest", 131: "minecraft:tripwire_hook", 132: "minecraft:tripwire",
-    133: "minecraft:emerald_block", 134: "minecraft:spruce_stairs",
-    135: "minecraft:birch_stairs", 136: "minecraft:jungle_stairs", 137: "minecraft:command_block",
-    138: "minecraft:beacon", 139: "minecraft:cobblestone_wall",
-    140: "minecraft:flower_pot", 141: "minecraft:carrots", 142: "minecraft:potatoes", 143: "minecraft:wooden_button",
-    144: "minecraft:skull", 145: "minecraft:anvil",
-    146: "minecraft:trapped_chest", 147: "minecraft:light_weighted_pressure_plate",
-    148: "minecraft:heavy_weighted_pressure_plate", 149: "minecraft:unpowered_comparator",
-    150: "minecraft:powered_comparator", 151: "minecraft:daylight_detector", 152: "minecraft:redstone_block",
-    153: "minecraft:quartz_ore", 154: "minecraft:hopper",
-    155: "minecraft:quartz_block", 156: "minecraft:quartz_stairs", 157: "minecraft:activator_rail",
-    158: "minecraft:dropper", 159: "minecraft:stained_hardened_clay",
-    160: "minecraft:stained_glass_pane", 162: "minecraft:log2", 163: "minecraft:acacia_stairs",
-    164: "minecraft:dark_oak_stairs", 165: "minecraft:slime", 166: "minecraft:barrier",
-    167: "minecraft:iron_trapdoor", 168: "minecraft:prismarine", 169: "minecraft:sea_lantern",
-    170: "minecraft:hay_block", 171: "minecraft:carpet", 172: "minecraft:hardened_clay", 173: "minecraft:coal_block",
-    174: "minecraft:packed_ice", 175: "minecraft:double_plant",
-    176: "minecraft:standing_banner", 177: "minecraft:wall_banner", 178: "minecraft:daylight_detector_inverted",
-    179: "minecraft:red_sandstone", 180: "minecraft:red_sandstone_stairs",
-    181: "minecraft:double_stone_slab2", 182: "minecraft:stone_slab2", 183: "minecraft:spruce_fence_gate",
-    184: "minecraft:birch_fence_gate", 185: "minecraft:jungle_fence_gate",
-    161: "minecraft:leaves2", 186: "minecraft:dark_oak_fence_gate", 187: "minecraft:acacia_fence_gate",
-    188: "minecraft:spruce_fence", 189: "minecraft:birch_fence", 190: "minecraft:jungle_fence",
-    191: "minecraft:dark_oak_fence", 192: "minecraft:acacia_fence", 193: "minecraft:spruce_door",
-    194: "minecraft:birch_door", 195: "minecraft:jungle_door", 196: "minecraft:acacia_door",
-    197: "minecraft:dark_oak_door"
-}
-'''
+def idToBlockstate(bid, data):
+    '''
+    Converts from a numerical ID to a BlockState string
+    
+    :param bid: The ID of the block
+    :type bid: int
+    :param data: The data value of the block
+    :type data: int
+    :return: The BlockState string
+    :rtype: str
+    '''
+    
+    name = block_map[bid].replace("minecraft:", "")
+
+    properties = {}
+    for prop in blockstates["minecraft"][name]["properties"]: # TODO: Change this if MCEdit's mod support ever improves
+        if prop["<data>"] == data:
+            for field in prop.keys():
+                if field == "<data>":
+                    continue
+                properties[field] = prop[field]
+            return (name, properties)            
+
+def blockstateToID(name, properties):
+    '''
+    Converts from a BlockState to a numerical ID/Data pair
+    
+    :param name: The BlockState name
+    :type name: str
+    :param properties: A list of Property/Value pairs in dict form
+    :type properties: list
+    :return: A tuple containing the numerical ID/Data pair (<id>, <data>)
+    :rtype: tuple
+    '''
+    if ":" in name:
+        prefix, name = name.split(":")
+    else:
+        prefix = "minecraft"
+    bid = blockstates[prefix][name]["id"]
+    for prop in blockstates[prefix][name]["properties"]:
+        correct = True
+        for (key, value) in properties.iteritems():
+            if key in prop:
+                correct = correct and (prop[key] == value)
+        if correct:
+            return (bid, prop["<data>"])
 
 __all__ = "indevMaterials, pocketMaterials, alphaMaterials, classicMaterials, namedMaterials, MCMaterials".split(", ")

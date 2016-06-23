@@ -50,6 +50,7 @@ from os.path import basename
 from pymclevel import block_fill, BoundingBox, materials, blockrotation
 import pymclevel
 from pymclevel.mclevelbase import exhaust
+from pymclevel.entity import TileEntity
 import random
 from __builtin__ import __import__
 from locale import getdefaultlocale
@@ -117,7 +118,7 @@ class BrushOperation(Operation):
 
 class BrushPanel(Panel):
     def __init__(self, tool):
-        Panel.__init__(self)
+        Panel.__init__(self, name='Panel.BrushPanel')
         self.tool = tool
         """
         presets, modeRow and styleRow are always created, no matter
@@ -177,7 +178,7 @@ class BrushPanel(Panel):
         type = value.__class__.__name__
         mi = 0
         ma = 100
-        if key in ('W','H','L'):
+        if key in ('W', 'H', 'L'):
             reference = AttrRef(self.tool, key)
         else:
             reference = ItemRef(self.tool.options, key)
@@ -192,24 +193,29 @@ class BrushPanel(Panel):
             aw = False
             if key in wcb:
                 aw = True
-            object = BlockButton(self.tool.editor.level.materials,
-                                 ref=reference,
-                                 recentBlocks=self.tool.recentBlocks[key],
-                                 allowWildcards=aw
-                                 )
+            field = BlockButton(self.tool.editor.level.materials,
+                                ref=reference,
+                                recentBlocks=self.tool.recentBlocks[key],
+                                allowWildcards=aw
+                                )
+        elif type == 'instancemethod':
+            field = Button(key, action=value)
         else:
             if doNotTranslate:
                 key = self.tool.brushMode.trn._(key)
                 value = self.tool.brushMode.trn._(value)
             if type == 'int':
-                object = IntInputRow(key, ref=reference, width=50, min=mi, max=ma, doNotTranslate=doNotTranslate)
+                field = IntInputRow(key, ref=reference, width=50, min=mi, max=ma, doNotTranslate=doNotTranslate)
             elif type == 'float':
-                object = FloatInputRow(key, ref=reference, width=50, min=mi, max=ma, doNotTranslate=doNotTranslate)
+                field = FloatInputRow(key, ref=reference, width=50, min=mi, max=ma, doNotTranslate=doNotTranslate)
             elif type == 'bool':
-                object = CheckBoxLabel(key, ref=reference, doNotTranslate=doNotTranslate)
+                field = CheckBoxLabel(key, ref=reference, doNotTranslate=doNotTranslate)
             elif type == 'str':
-                object = Label(value, doNotTranslate=doNotTranslate)
-        return object
+                field = Label(value, doNotTranslate=doNotTranslate)
+            else:
+                print type
+                field = None
+        return field
 
     def brushModeChanged(self):
         """
@@ -341,7 +347,7 @@ class BrushPanel(Panel):
 
 class BrushToolOptions(ToolOptions):
     def __init__(self, tool):
-        Panel.__init__(self)
+        ToolOptions.__init__(self, name='Panel.BrushToolOptions')
         alphaField = FloatField(ref=ItemRef(tool.settings, 'brushAlpha'), min=0.0, max=1.0, width=60)
         alphaField.increment = 0.1
         alphaRow = Row((Label("Alpha: "), alphaField))
@@ -397,7 +403,9 @@ class BrushTool(CloneTool):
     Used to determine the distance between the block the cursor is pointing at, and the center of the brush.
     Increased by scrolling up, decreased by scrolling down (default keys)
     """
+
     _reticleOffset = 1
+
     @property
     def reticleOffset(self):
         if getattr(self.brushMode, 'draggableBrush', True):
@@ -524,9 +532,10 @@ class BrushTool(CloneTool):
                 m.trn = trn
                 albow.translate.setLangPath(old_trn_path)
                 albow.translate.buildTranslation(config.settings.langCode.get())
-                self.editor.mcedit.set_update_translation(True)
-                self.editor.mcedit.set_update_translation(False)
+                self.editor.mcedit.set_update_ui(True)
+                self.editor.mcedit.set_update_ui(False)
             m.materials = self.editor.level.materials
+            m.tool = self
             m.createInputs(m)
             return m
         except Exception, e:
@@ -586,6 +595,8 @@ class BrushTool(CloneTool):
                     for b in blockList:
                         saveList.append((b.ID, b.blockData))
                     optionsToSave[key + 'recentBlocks'] = saveList
+            elif self.options[key].__class__.__name__ == 'instancemethod':
+                continue
             else:
                 optionsToSave[key] = self.options[key]
         optionsToSave["Mode"] = getattr(self, 'selectedBrushMode', 'Fill')
@@ -604,7 +615,7 @@ class BrushTool(CloneTool):
         except:
             alert('Exception while trying to load preset. See console for details.')
         loadedBrushOptions = ast.literal_eval(f.read())
-        
+
         brushMode = self.brushModes.get(loadedBrushOptions.get("Mode", None), None)
         if brushMode is not None:
             self.selectedBrushMode = loadedBrushOptions["Mode"]
@@ -1139,3 +1150,16 @@ def createBrushMask(shape, style="Round", offset=(0, 0, 0), box=None, chance=100
         return mask[1:-1, 1:-1, 1:-1]
     else:
         return mask
+
+def createTileEntities(block, box, chunk):
+    if box is None or block.stringID not in TileEntity.stringNames.keys():
+        return
+
+    tileEntity = TileEntity.stringNames[block.stringID]
+    for (x, y, z) in box.positions:
+        if chunk.world.blockAt(x, y, z) == block.ID:
+            if chunk.tileEntityAt(x, y, z):
+                chunk.removeTileEntitiesInBox(BoundingBox((x, y, z), (1, 1, 1)))
+            tileEntityObject = TileEntity.Create(tileEntity, (x, y, z))
+            chunk.TileEntities.append(tileEntityObject)
+            chunk._fakeEntities = None

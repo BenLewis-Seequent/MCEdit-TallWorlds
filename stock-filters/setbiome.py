@@ -51,9 +51,10 @@ inputs = (
                 "Extreme Hills+",
                 "Savanna",
                 "Savanna Plateau",
-                "Messa",
-                "Messa Plateau F",
-                "Messa Plateau",
+                "Mesa",
+                "Mesa Plateau F",
+                "Mesa Plateau",
+                "The Void",
                 "Sunflower Plains",
                 "Desert M",
                 "Extreme Hills M",
@@ -69,7 +70,7 @@ inputs = (
                 "Roofed Forest M",
                 "Cold Taiga M",
                 "Mega Spruce Taiga",
-                "Mega Spruce Taiga ",
+                "Mega Spruce Taiga Hills",
                 "Extreme Hills+ M",
                 "Savanna M",
                 "Savanna Plateau M",
@@ -118,9 +119,10 @@ biomes = {
     "Extreme Hills+": 34,
     "Savanna": 35,
     "Savanna Plateau": 36,
-    "Messa": 37,
-    "Messa Plateau F": 38,
-    "Messa Plateau": 39,
+    "Mesa": 37,
+    "Mesa Plateau F": 38,
+    "Mesa Plateau": 39,
+    "The Void": 127,
     "Sunflower Plains": 129,
     "Desert M": 130,
     "Extreme Hills M": 131,
@@ -136,7 +138,7 @@ biomes = {
     "Roofed Forest M": 157,
     "Cold Taiga M": 158,
     "Mega Spruce Taiga": 160,
-    "Mega Spruce Taiga 2": 161,
+    "Mega Spruce Taiga Hills": 161,
     "Extreme Hills+ M": 162,
     "Savanna M": 163,
     "Savanna Plateau M": 164,
@@ -148,7 +150,7 @@ biomes = {
 
 
 def perform(level, box, options):
-    biome = biomes[options["Biome"]]
+    biome = dict([(trn._(a), b) for a, b in biomes.items()])[options["Biome"]]
 
     minx = int(box.minx / 16) * 16
     minz = int(box.minz / 16) * 16
